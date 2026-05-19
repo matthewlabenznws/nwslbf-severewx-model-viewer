@@ -5,7 +5,7 @@
 # HRRR R2 TEST | LBF Domain
 # 1 km Reflectivity + UH + Sim IR + Theta Cold Pools
 # + 4–6 km Storm-Relative Winds using 700–500 mb proxy
-# Uploads PNGs + runs.json to Cloudflare R2
+# Uploads runs.json immediately, then uploads PNGs as they finish
 # ============================================================
 
 import os
@@ -250,7 +250,6 @@ LOGO_PATH = os.path.join(BASE_DIR, "assets", "NOAANWSLogos.png")
 MANUAL_STORM_MOTION_FROM_DEG = 250
 MANUAL_STORM_MOTION_SPEED_KT = 35
 
-# TEST SETTINGS: only run F000-F003 for first R2 test
 MAX_FHR = 18
 START_FHR = 0
 
@@ -527,6 +526,20 @@ def plot_city_labels(ax, cities, zorder=40, fontsize=9):
 cycle_date, cycle_hour = find_latest_hrrr_cycle()
 cycle_str = f"{cycle_date}_{cycle_hour:02d}z"
 
+# Upload runs.json immediately so the new run appears right away
+runs_json = {"runs": [cycle_str]}
+
+with open("runs.json", "w") as f:
+    json.dump(runs_json, f, indent=2)
+
+upload_to_r2(
+    "runs.json",
+    "runs/hrrr/refl_uh/runs.json",
+    content_type="application/json"
+)
+
+print("Uploaded initial runs.json for:", cycle_str)
+
 OUTDIR = os.path.join(
     "site",
     "runs",
@@ -538,7 +551,6 @@ OUTDIR = os.path.join(
 os.makedirs(OUTDIR, exist_ok=True)
 os.makedirs("site", exist_ok=True)
 
-# TEST ONLY: F000-F003
 fhrs = range(START_FHR, MAX_FHR + 1)
 
 lbf_geom = get_lbf_cwa_geom(LBF_CWA_SHP)
@@ -930,22 +942,5 @@ for fhr in fhrs:
     for domain_key, cfg in DOMAINS.items():
         plot_domain_from_fields(fields, domain_key, cfg, fhr)
 
-
-# ============================================================
-# UPLOAD RUNS.JSON
-# ============================================================
-
-runs_json = {
-    "runs": [cycle_str]
-}
-
-with open("runs.json", "w") as f:
-    json.dump(runs_json, f, indent=2)
-
-upload_to_r2(
-    "runs.json",
-    "runs/hrrr/refl_uh/runs.json",
-    content_type="application/json"
-)
 
 print("Done. Uploaded HRRR reflectivity test to R2.")
