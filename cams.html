@@ -106,11 +106,11 @@
 <div class="navbar">
   <a href="index.html">HOME</a>
   <span>/</span>
-
-  <a href="cams.html?model=hrrr">HRRR</a>
+  <a href="cams.html?model=hrrr&product=refl_uh">HRRR REFL/UH</a>
   <span>/</span>
-
-  <a href="cams.html?model=rrfs">RRFS</a>
+  <a href="cams.html?model=hrrr&product=hail_swath">HRRR HAIL SWATH</a>
+  <span>/</span>
+  <a href="cams.html?model=rrfs&product=refl_uh">RRFS</a>
 </div>
 
 <div class="topbar">
@@ -134,11 +134,8 @@
 
 <div class="controls">
   <button onclick="togglePlay()" id="playBtn">▶ Play</button>
-
   <button onclick="latestRun()">Latest</button>
-
   <input id="slider" type="range" min="0" max="18" value="0">
-
   <div id="fhrLabel">000</div>
 </div>
 
@@ -158,6 +155,9 @@ const params =
 let selectedModel =
   params.get("model") || "hrrr";
 
+let selectedProduct =
+  params.get("product") || "refl_uh";
+
 let runs = [];
 let selectedRun = "";
 let selectedDomain = "regional";
@@ -166,54 +166,41 @@ let maxFhr = 18;
 let playing = false;
 let timer = null;
 
-const runSelect =
-  document.getElementById("runSelect");
-
-const domainSelect =
-  document.getElementById("domainSelect");
-
-const plot =
-  document.getElementById("plot");
-
-const slider =
-  document.getElementById("slider");
-
-const tiles =
-  document.getElementById("tiles");
-
-const fhrLabel =
-  document.getElementById("fhrLabel");
-
-const playBtn =
-  document.getElementById("playBtn");
-
-const viewerTitle =
-  document.getElementById("viewerTitle");
-
+const runSelect = document.getElementById("runSelect");
+const domainSelect = document.getElementById("domainSelect");
+const plot = document.getElementById("plot");
+const slider = document.getElementById("slider");
+const tiles = document.getElementById("tiles");
+const fhrLabel = document.getElementById("fhrLabel");
+const playBtn = document.getElementById("playBtn");
+const viewerTitle = document.getElementById("viewerTitle");
 
 function getProductPath() {
-  return "/runs/cams/" +
-    selectedModel +
-    "/refl_uh";
+  return "/runs/cams/" + selectedModel + "/" + selectedProduct;
 }
 
+function productLabel() {
+  if (selectedProduct === "hail_swath") return "Hail Swath";
+  if (selectedProduct === "refl_uh") return "Reflectivity / UH";
+  return selectedProduct;
+}
 
 function updateTitle() {
   viewerTitle.textContent =
-    selectedModel.toUpperCase() +
-    " Reflectivity / UH";
+    selectedModel.toUpperCase() + " " + productLabel();
 }
-
 
 function fhrName(fhr) {
   return String(fhr).padStart(3, "0");
 }
 
+function getFileName(fhr) {
+  if (selectedProduct === "hail_swath") {
+    return selectedModel + "_hail_swath_f" + fhrName(fhr) + ".png";
+  }
 
-function getFilePrefix() {
-  return selectedModel + "_lbf_f";
+  return selectedModel + "_lbf_f" + fhrName(fhr) + ".png";
 }
-
 
 function imgSrc(fhr) {
   if (!selectedRun) return "";
@@ -222,12 +209,10 @@ function imgSrc(fhr) {
     getProductPath() + "/" +
     selectedRun + "/" +
     selectedDomain + "/" +
-    getFilePrefix() +
-    fhrName(fhr) +
-    ".png?t=" +
+    getFileName(fhr) +
+    "?t=" +
     Date.now();
 }
-
 
 async function loadRunsJson() {
   try {
@@ -239,11 +224,8 @@ async function loadRunsJson() {
         Date.now()
       );
 
-    const data =
-      await response.json();
-
-    runs =
-      data.runs || [];
+    const data = await response.json();
+    runs = data.runs || [];
 
   } catch (e) {
     console.warn("Could not load runs.json", e);
@@ -251,48 +233,32 @@ async function loadRunsJson() {
   }
 }
 
-
 function runId(run) {
-  if (typeof run === "string") {
-    return run;
-  }
-
+  if (typeof run === "string") return run;
   return run.id;
 }
 
-
 function runLabel(run) {
-  if (typeof run === "string") {
-    return run.replace("_", " ");
-  }
-
+  if (typeof run === "string") return run.replace("_", " ");
   return run.label || run.id;
 }
-
 
 function getRunObjById(id) {
   return runs.find(run => runId(run) === id);
 }
 
-
 function updateMaxFhrForRun() {
-  const runObj =
-    getRunObjById(selectedRun);
+  const runObj = getRunObjById(selectedRun);
 
   if (
     runObj &&
     typeof runObj !== "string" &&
     runObj.max_fhr !== undefined
   ) {
-    maxFhr =
-      Number(runObj.max_fhr);
-  }
-  else {
-    const hourText =
-      selectedRun.split("_")[1] || "";
-
-    const hour =
-      Number(hourText.replace("z", ""));
+    maxFhr = Number(runObj.max_fhr);
+  } else {
+    const hourText = selectedRun.split("_")[1] || "";
+    const hour = Number(hourText.replace("z", ""));
 
     maxFhr =
       [0, 6, 12, 18].includes(hour)
@@ -300,75 +266,46 @@ function updateMaxFhrForRun() {
       : 18;
   }
 
-  slider.max =
-    maxFhr;
-
+  slider.max = maxFhr;
   buildHourButtons();
 }
 
-
 function populateRunDropdown() {
-  const oldRun =
-    selectedRun;
-
+  const oldRun = selectedRun;
   runSelect.innerHTML = "";
 
   runs.forEach(run => {
-    const opt =
-      document.createElement("option");
-
-    opt.value =
-      runId(run);
-
-    opt.textContent =
-      runLabel(run);
-
+    const opt = document.createElement("option");
+    opt.value = runId(run);
+    opt.textContent = runLabel(run);
     runSelect.appendChild(opt);
   });
 
-  const runIds =
-    runs.map(run => runId(run));
+  const runIds = runs.map(run => runId(run));
 
   if (runIds.includes(oldRun)) {
     selectedRun = oldRun;
-  }
-  else {
+  } else {
     selectedRun = runIds[0] || "";
   }
 
-  runSelect.value =
-    selectedRun;
-
+  runSelect.value = selectedRun;
   updateMaxFhrForRun();
 }
 
-
 function buildHourButtons() {
   tiles.innerHTML = "";
-
-  slider.max =
-    maxFhr;
+  slider.max = maxFhr;
 
   for (let i = 0; i <= maxFhr; i++) {
-    const btn =
-      document.createElement("button");
-
-    btn.className =
-      "frame missing";
-
-    btn.id =
-      "btn" + i;
-
-    btn.textContent =
-      fhrName(i);
-
-    btn.onclick =
-      () => setFrame(i);
-
+    const btn = document.createElement("button");
+    btn.className = "frame missing";
+    btn.id = "btn" + i;
+    btn.textContent = fhrName(i);
+    btn.onclick = () => setFrame(i);
     tiles.appendChild(btn);
   }
 }
-
 
 function setFrame(fhr) {
   current =
@@ -377,14 +314,10 @@ function setFrame(fhr) {
       Math.min(maxFhr, Number(fhr))
     );
 
-  slider.value =
-    current;
+  slider.value = current;
+  fhrLabel.textContent = fhrName(current);
 
-  fhrLabel.textContent =
-    fhrName(current);
-
-  const src =
-    imgSrc(current);
+  const src = imgSrc(current);
 
   if (src) {
     plot.src = src;
@@ -392,79 +325,55 @@ function setFrame(fhr) {
 
   document
     .querySelectorAll(".frame")
-    .forEach(btn =>
-      btn.classList.remove("active")
-    );
+    .forEach(btn => btn.classList.remove("active"));
 
   const active =
-    document.getElementById(
-      "btn" + current
-    );
+    document.getElementById("btn" + current);
 
   if (active) {
     active.classList.add("active");
   }
 }
 
-
 function refreshHourAvailability() {
   for (let i = 0; i <= maxFhr; i++) {
-    const btn =
-      document.getElementById("btn" + i);
-
+    const btn = document.getElementById("btn" + i);
     if (!btn) continue;
 
-    btn.classList.remove(
-      "available",
-      "missing"
-    );
-
+    btn.classList.remove("available", "missing");
     btn.classList.add("missing");
 
-    const testImg =
-      new Image();
+    const testImg = new Image();
 
-    testImg.onload =
-      function() {
-        btn.classList.remove("missing");
-        btn.classList.add("available");
-      };
+    testImg.onload = function() {
+      btn.classList.remove("missing");
+      btn.classList.add("available");
+    };
 
-    testImg.onerror =
-      function() {
-        btn.classList.remove("available");
-        btn.classList.add("missing");
-      };
+    testImg.onerror = function() {
+      btn.classList.remove("available");
+      btn.classList.add("missing");
+    };
 
-    testImg.src =
-      imgSrc(i);
+    testImg.src = imgSrc(i);
   }
 }
 
-
 function changeRun() {
-  selectedRun =
-    runSelect.value;
-
+  selectedRun = runSelect.value;
   current = 0;
 
   updateMaxFhrForRun();
-
   refreshHourAvailability();
-
   setFrame(0);
 }
 
-
 function changeDomain() {
-  selectedDomain =
-    domainSelect.value;
+  selectedDomain = domainSelect.value;
 
   refreshHourAvailability();
-
   setFrame(current);
 }
-
 
 function latestRun() {
   selectedRun =
@@ -472,25 +381,19 @@ function latestRun() {
     ? runId(runs[0])
     : "";
 
-  runSelect.value =
-    selectedRun;
-
+  runSelect.value = selectedRun;
   current = 0;
 
   updateMaxFhrForRun();
-
   refreshHourAvailability();
-
   setFrame(0);
 }
-
 
 function togglePlay() {
   playing = !playing;
 
   if (playing) {
-    playBtn.textContent =
-      "⏸ Pause";
+    playBtn.textContent = "⏸ Pause";
 
     timer =
       setInterval(() => {
@@ -501,47 +404,36 @@ function togglePlay() {
 
         setFrame(current);
       }, 650);
-  }
-  else {
-    playBtn.textContent =
-      "▶ Play";
 
+  } else {
+    playBtn.textContent = "▶ Play";
     clearInterval(timer);
   }
 }
-
 
 slider.oninput =
   function() {
     setFrame(slider.value);
   };
 
-
 async function refreshViewer() {
   await loadRunsJson();
-
   populateRunDropdown();
-
   refreshHourAvailability();
 }
-
 
 async function init() {
   updateTitle();
 
   await loadRunsJson();
-
   populateRunDropdown();
-
   refreshHourAvailability();
-
   setFrame(0);
 
   setInterval(async () => {
     await refreshViewer();
   }, 30000);
 }
-
 
 init();
 </script>
