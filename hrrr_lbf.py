@@ -526,8 +526,82 @@ def plot_city_labels(ax, cities, zorder=40, fontsize=9):
 cycle_date, cycle_hour = find_latest_hrrr_cycle()
 cycle_str = f"{cycle_date}_{cycle_hour:02d}z"
 
-# Upload runs.json immediately so the new run appears right away
-runs_json = {"runs": [cycle_str]}
+# ============================================================
+# DETERMINE MAX FORECAST HOUR
+# ============================================================
+
+if cycle_hour in [0, 6, 12, 18]:
+    MAX_FHR = 48
+else:
+    MAX_FHR = 18
+
+# ============================================================
+# LOAD EXISTING runs.json
+# ============================================================
+
+old_runs = []
+
+try:
+    obj = s3.get_object(
+        Bucket=BUCKET,
+        Key="runs/cams/hrrr/refl_uh/runs.json"
+    )
+
+    old_data = json.loads(
+        obj["Body"].read().decode("utf-8")
+    )
+
+    old_runs = old_data.get("runs", [])
+
+except Exception:
+    old_runs = []
+
+# ============================================================
+# BUILD NEW RUN ENTRY
+# ============================================================
+
+new_run = {
+    "id": cycle_str,
+    "label": (
+        f"{cycle_date[:4]}-"
+        f"{cycle_date[4:6]}-"
+        f"{cycle_date[6:8]} "
+        f"{cycle_hour:02d}z"
+    ),
+    "max_fhr": MAX_FHR
+}
+
+combined = [new_run]
+
+for r in old_runs:
+
+    if isinstance(r, str):
+
+        rid = r
+
+        rhour = int(
+            rid.split("_")[1].replace("z", "")
+        )
+
+        combined.append({
+            "id": rid,
+            "label": rid.replace("_", " "),
+            "max_fhr": (
+                48 if rhour in [0, 6, 12, 18]
+                else 18
+            )
+        })
+
+    elif r.get("id") != cycle_str:
+        combined.append(r)
+
+# ============================================================
+# KEEP ONLY LAST 4 RUNS
+# ============================================================
+
+runs_json = {
+    "runs": combined[:4]
+}
 
 with open("runs.json", "w") as f:
     json.dump(runs_json, f, indent=2)
@@ -538,7 +612,11 @@ upload_to_r2(
     content_type="application/json"
 )
 
-print("Uploaded initial runs.json for:", cycle_str)
+print("Uploaded runs.json with last 4 runs.")
+
+# ============================================================
+# OUTPUT SETUP
+# ============================================================
 
 OUTDIR = os.path.join(
     "site",
