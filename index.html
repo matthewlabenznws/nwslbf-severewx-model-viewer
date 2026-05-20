@@ -20,7 +20,7 @@
 <body>
 
 <div class="topbar">
-  <b>HRRR Reflectivity / UH | R2 Test Viewer</b>
+  <b>CAMs | HRRR Reflectivity / UH</b>
   &nbsp;&nbsp;
   Run: <select id="runSelect" onchange="changeRun()"></select>
   &nbsp;&nbsp;
@@ -47,6 +47,7 @@
 
 <script>
 const BASE_URL = "https://pub-7819f05640674537af897dbdd15c5d0c.r2.dev";
+const PRODUCT_PATH = "/runs/cams/hrrr/refl_uh";
 
 let runs = [];
 let selectedRun = "";
@@ -72,7 +73,7 @@ function imgSrc(fhr) {
   if (!selectedRun) return "";
 
   return BASE_URL +
-    "/runs/hrrr/refl_uh/" +
+    PRODUCT_PATH + "/" +
     selectedRun + "/" +
     selectedDomain + "/" +
     "hrrr_lbf_f" + fhrName(fhr) + ".png?t=" +
@@ -81,7 +82,7 @@ function imgSrc(fhr) {
 
 async function loadRunsJson() {
   try {
-    const response = await fetch(BASE_URL + "/runs/hrrr/refl_uh/runs.json?t=" + Date.now());
+    const response = await fetch(BASE_URL + PRODUCT_PATH + "/runs.json?t=" + Date.now());
     const data = await response.json();
     runs = data.runs || [];
   } catch (e) {
