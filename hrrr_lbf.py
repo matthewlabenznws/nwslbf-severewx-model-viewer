@@ -767,7 +767,7 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
         uh25_plot = gaussian_filter(uh25_sub, sigma=0.2)
         uh02_plot = gaussian_filter(uh02_sub, sigma=0.2)
 
-        uh_combined = np.where((uh25_plot >= 75) | (uh03_plot >= 50), 1, np.nan)
+        uh_combined = np.where((uh25_plot >= 75) | (uh02_plot >= 50), 1, np.nan)
 
         theta_prime_smooth = gaussian_filter(theta_prime_sub, sigma=2.5)
         theta_cp_mask = np.ma.masked_where(theta_prime_smooth > -2.0, theta_prime_smooth)
