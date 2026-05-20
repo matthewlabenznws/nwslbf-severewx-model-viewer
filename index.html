@@ -1,227 +1,83 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>HRRR R2 Model Viewer</title>
+  <title>NWS LBF Model Viewer</title>
   <style>
-    body { margin:0; background:#111; color:white; font-family:Arial; text-align:center; }
-    .topbar { background:#1b1b1b; padding:10px; border-bottom:1px solid #444; }
-    select, button { background:#2c2c2c; color:white; border:1px solid #666; padding:6px 10px; border-radius:3px; font-weight:bold; }
-    .controls { display:grid; grid-template-columns:auto auto 1fr auto; gap:10px; padding:8px 12px; background:#181818; }
-    input[type="range"] { width:100%; }
-    .tiles { display:flex; flex-wrap:wrap; justify-content:center; gap:3px; padding:8px; background:#0f0f0f; }
-    .frame { min-width:44px; padding:5px 8px; }
-    .available { background:#2b7cff; color:white; border-color:#9ec0ff; }
-    .missing { background:#111; color:#aaa; border-color:#555; }
-    .active { outline:2px solid white; }
-    #plot { max-width:98vw; max-height:calc(100vh - 190px); border:1px solid #333; background:#000; }
+    body {
+      margin: 0;
+      background: #111;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+
+    .navbar {
+      background: #1a1a1a;
+      padding: 12px 18px;
+      border-bottom: 1px solid #333;
+      text-align: left;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .navbar a {
+      color: white;
+      text-decoration: none;
+      margin: 0 6px;
+    }
+
+    .navbar a:hover {
+      color: #6ea8ff;
+    }
+
+    .navbar span {
+      color: #777;
+    }
+
+    .content {
+      padding: 30px;
+    }
+
+    .section-card {
+      display: inline-block;
+      background: #1b1b1b;
+      border: 1px solid #333;
+      padding: 22px;
+      margin: 12px;
+      border-radius: 6px;
+      min-width: 240px;
+      color: white;
+      text-decoration: none;
+    }
+
+    .section-card:hover {
+      border-color: #6ea8ff;
+    }
   </style>
 </head>
 
 <body>
 
-<div class="topbar">
-  <b>CAMs | HRRR Reflectivity / UH</b>
-  &nbsp;&nbsp;
-  Run: <select id="runSelect" onchange="changeRun()"></select>
-  &nbsp;&nbsp;
-  Domain:
-  <select id="domainSelect" onchange="changeDomain()">
-    <option value="regional">Regional</option>
-    <option value="lbf">LBF</option>
-    <option value="central_plains">Central Plains</option>
-    <option value="spc_severe">SPC Severe</option>
-  </select>
+<div class="navbar">
+  <a href="index.html">HOME</a>
+  <span>/</span>
+  <a href="cams.html?model=hrrr">CAMS</a>
+  <span>/</span>
+  <a href="mesoensembles.html">MESO-ENSEMBLES</a>
 </div>
 
-<div class="controls">
-  <button onclick="togglePlay()" id="playBtn">▶ Play</button>
-  <button onclick="latestRun()">Latest</button>
-  <input id="slider" type="range" min="0" max="18" value="0">
-  <div id="fhrLabel">000</div>
+<div class="content">
+  <h1>NWS LBF Model Viewer</h1>
+
+  <a class="section-card" href="cams.html?model=hrrr">
+    <h2>CAMs</h2>
+    <p>HRRR, RRFS, and future convection-allowing model guidance.</p>
+  </a>
+
+  <a class="section-card" href="mesoensembles.html">
+    <h2>Meso-Ensembles</h2>
+    <p>REFS, HREF, and severe-weather probability guidance.</p>
+  </a>
 </div>
-
-<div class="tiles" id="tiles"></div>
-
-<br>
-<img id="plot" src="">
-
-<script>
-const BASE_URL = "https://pub-7819f05640674537af897dbdd15c5d0c.r2.dev";
-const PRODUCT_PATH = "/runs/cams/hrrr/refl_uh";
-
-let runs = [];
-let selectedRun = "";
-let selectedDomain = "regional";
-let current = 0;
-let maxFhr = 18;
-let playing = false;
-let timer = null;
-
-const runSelect = document.getElementById("runSelect");
-const domainSelect = document.getElementById("domainSelect");
-const plot = document.getElementById("plot");
-const slider = document.getElementById("slider");
-const tiles = document.getElementById("tiles");
-const fhrLabel = document.getElementById("fhrLabel");
-const playBtn = document.getElementById("playBtn");
-
-function fhrName(fhr) {
-  return String(fhr).padStart(3, "0");
-}
-
-function imgSrc(fhr) {
-  if (!selectedRun) return "";
-
-  return BASE_URL +
-    PRODUCT_PATH + "/" +
-    selectedRun + "/" +
-    selectedDomain + "/" +
-    "hrrr_lbf_f" + fhrName(fhr) + ".png?t=" +
-    Date.now();
-}
-
-async function loadRunsJson() {
-  try {
-    const response = await fetch(BASE_URL + PRODUCT_PATH + "/runs.json?t=" + Date.now());
-    const data = await response.json();
-    runs = data.runs || [];
-  } catch (e) {
-    console.warn("Could not load runs.json", e);
-    runs = [];
-  }
-}
-
-function populateRunDropdown() {
-  const oldRun = selectedRun;
-  runSelect.innerHTML = "";
-
-  runs.forEach(run => {
-    const opt = document.createElement("option");
-    opt.value = run;
-    opt.textContent = run;
-    runSelect.appendChild(opt);
-  });
-
-  if (runs.includes(oldRun)) {
-    selectedRun = oldRun;
-  } else {
-    selectedRun = runs[0] || "";
-  }
-
-  runSelect.value = selectedRun;
-}
-
-function buildHourButtons() {
-  tiles.innerHTML = "";
-  slider.max = maxFhr;
-
-  for (let i = 0; i <= maxFhr; i++) {
-    const btn = document.createElement("button");
-    btn.className = "frame missing";
-    btn.id = "btn" + i;
-    btn.textContent = fhrName(i);
-    btn.onclick = () => setFrame(i);
-    tiles.appendChild(btn);
-  }
-}
-
-function setFrame(fhr) {
-  current = Math.max(0, Math.min(maxFhr, Number(fhr)));
-  slider.value = current;
-  fhrLabel.textContent = fhrName(current);
-
-  const src = imgSrc(current);
-  if (src) plot.src = src;
-
-  document.querySelectorAll(".frame").forEach(btn => btn.classList.remove("active"));
-  const active = document.getElementById("btn" + current);
-  if (active) active.classList.add("active");
-}
-
-function refreshHourAvailability() {
-  for (let i = 0; i <= maxFhr; i++) {
-    const btn = document.getElementById("btn" + i);
-    if (!btn) continue;
-
-    btn.classList.remove("available", "missing");
-    btn.classList.add("missing");
-
-    const testImg = new Image();
-
-    testImg.onload = function() {
-      btn.classList.remove("missing");
-      btn.classList.add("available");
-    };
-
-    testImg.onerror = function() {
-      btn.classList.remove("available");
-      btn.classList.add("missing");
-    };
-
-    testImg.src = imgSrc(i);
-  }
-}
-
-function changeRun() {
-  selectedRun = runSelect.value;
-  current = 0;
-  refreshHourAvailability();
-  setFrame(0);
-}
-
-function changeDomain() {
-  selectedDomain = domainSelect.value;
-  refreshHourAvailability();
-  setFrame(current);
-}
-
-function latestRun() {
-  selectedRun = runs[0] || "";
-  runSelect.value = selectedRun;
-  current = 0;
-  refreshHourAvailability();
-  setFrame(0);
-}
-
-function togglePlay() {
-  playing = !playing;
-
-  if (playing) {
-    playBtn.textContent = "⏸ Pause";
-    timer = setInterval(() => {
-      current = current >= maxFhr ? 0 : current + 1;
-      setFrame(current);
-    }, 650);
-  } else {
-    playBtn.textContent = "▶ Play";
-    clearInterval(timer);
-  }
-}
-
-slider.oninput = function() {
-  setFrame(slider.value);
-};
-
-async function refreshViewer() {
-  await loadRunsJson();
-  populateRunDropdown();
-  refreshHourAvailability();
-}
-
-async function init() {
-  await loadRunsJson();
-  populateRunDropdown();
-  buildHourButtons();
-  refreshHourAvailability();
-  setFrame(0);
-
-  setInterval(async () => {
-    await refreshViewer();
-  }, 30000);
-}
-
-init();
-</script>
 
 </body>
 </html>
