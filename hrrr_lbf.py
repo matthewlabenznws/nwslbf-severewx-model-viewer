@@ -655,7 +655,7 @@ def load_hrrr_fields_once(fhr):
     uh02_da = hrrr_field(cycle_date, cycle_hour, fhr, "sfc", ":MXUPHL:2000-0 m", "0–2 km UH")
     
     uh25 = np.asarray(uh25_da.values, dtype=float)
-    uh02 = np.asarray(uh03_da.values, dtype=float)
+    uh02 = np.asarray(uh02_da.values, dtype=float)
 
     ir_da = hrrr_field(cycle_date, cycle_hour, fhr, "sfc", ":SBT123:", "simulated IR brightness temperature")
     ir_c = k_to_c(ir_da.values)
