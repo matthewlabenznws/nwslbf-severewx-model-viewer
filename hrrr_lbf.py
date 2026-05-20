@@ -652,10 +652,10 @@ def load_hrrr_fields_once(fhr):
     refl = np.where(refl >= REF_LEVELS[0], refl, np.nan)
 
     uh25_da = hrrr_field(cycle_date, cycle_hour, fhr, "sfc", ":MXUPHL:5000-2000 m", "2–5 km UH")
-    uh03_da = hrrr_field(cycle_date, cycle_hour, fhr, "sfc", ":MXUPHL:3000-0 m", "0–3 km UH")
-
+    uh02_da = hrrr_field(cycle_date, cycle_hour, fhr, "sfc", ":MXUPHL:2000-0 m", "0–2 km UH")
+    
     uh25 = np.asarray(uh25_da.values, dtype=float)
-    uh03 = np.asarray(uh03_da.values, dtype=float)
+    uh02 = np.asarray(uh03_da.values, dtype=float)
 
     ir_da = hrrr_field(cycle_date, cycle_hour, fhr, "sfc", ":SBT123:", "simulated IR brightness temperature")
     ir_c = k_to_c(ir_da.values)
@@ -718,7 +718,7 @@ def load_hrrr_fields_once(fhr):
         "lon": lon,
         "refl": refl,
         "uh25": uh25,
-        "uh03": uh03,
+        "uh02": uh02,
         "ir_c": ir_c,
         "theta_prime": theta_prime,
         "sr46_kt": sr46_kt,
@@ -746,7 +746,7 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
         lon = fields["lon"]
         refl = fields["refl"]
         uh25 = fields["uh25"]
-        uh03 = fields["uh03"]
+        uh02 = fields["uh02"]
         ir_c = fields["ir_c"]
         theta_prime = fields["theta_prime"]
         sr46_kt = fields["sr46_kt"]
@@ -754,10 +754,10 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
         sr_v46 = fields["sr_v46"]
 
         lat_sub, lon_sub, [
-            refl_sub, uh25_sub, uh03_sub, ir_sub,
+            refl_sub, uh25_sub, uh02_sub, ir_sub,
             theta_prime_sub, sr46_sub, sr_u46_sub, sr_v46_sub
         ] = subset_2d(
-            lat, lon, refl, uh25, uh03, ir_c,
+            lat, lon, refl, uh25, uh02, ir_c,
             theta_prime, sr46_kt, sr_u46, sr_v46
         )
 
@@ -765,7 +765,7 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
         refl_plot = np.where(refl_plot >= 5, refl_plot, np.nan)
 
         uh25_plot = gaussian_filter(uh25_sub, sigma=0.2)
-        uh03_plot = gaussian_filter(uh03_sub, sigma=0.2)
+        uh02_plot = gaussian_filter(uh02_sub, sigma=0.2)
 
         uh_combined = np.where((uh25_plot >= 75) | (uh03_plot >= 50), 1, np.nan)
 
@@ -842,7 +842,7 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
         )
 
         ax.contour(
-            lon_sub, lat_sub, uh03_plot,
+            lon_sub, lat_sub, uh02_plot,
             levels=[50],
             colors="black",
             linewidths=0.9,
@@ -896,7 +896,7 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
 
         main_title = (
             "HRRR | 1 km Refl, 2-5km UH > 75, "
-            "0-3km UH > 50, Sim. IR, θ Cold Pools, 4-6 km SR Winds"
+            "0-2km UH > 50, Sim. IR, θ Cold Pools, 4-6 km SR Winds"
         )
 
         valid_title = f"F{fhr:03d} Valid: {valid_dt:%a %Y-%m-%d %Hz}"
