@@ -534,7 +534,7 @@ with open("runs.json", "w") as f:
 
 upload_to_r2(
     "runs.json",
-    "runs/hrrr/refl_uh/runs.json",
+    "runs/cams/hrrr/refl_uh/runs.json",
     content_type="application/json"
 )
 
@@ -920,12 +920,11 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
         filename = os.path.basename(outname)
 
         remote_key = (
-            f"runs/hrrr/refl_uh/"
-            f"{cycle_str}/"
-            f"{domain_key}/"
-            f"{filename}"
+        f"runs/cams/hrrr/refl_uh/"
+        f"{cycle_str}/"
+        f"{domain_key}/"
+        f"{filename}"
         )
-
         upload_to_r2(outname, remote_key)
 
     except Exception as e:
