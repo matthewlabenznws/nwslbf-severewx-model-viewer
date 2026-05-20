@@ -114,7 +114,6 @@
 </div>
 
 <div class="topbar">
-
   <b id="viewerTitle">HRRR Reflectivity / UH</b>
 
   &nbsp;&nbsp;
@@ -131,23 +130,16 @@
     <option value="central_plains">Central Plains</option>
     <option value="spc_severe">SPC Severe</option>
   </select>
-
 </div>
 
 <div class="controls">
+  <button onclick="togglePlay()" id="playBtn">▶ Play</button>
 
-  <button onclick="togglePlay()" id="playBtn">
-    ▶ Play
-  </button>
-
-  <button onclick="latestRun()">
-    Latest
-  </button>
+  <button onclick="latestRun()">Latest</button>
 
   <input id="slider" type="range" min="0" max="18" value="0">
 
   <div id="fhrLabel">000</div>
-
 </div>
 
 <div class="tiles" id="tiles"></div>
@@ -157,11 +149,11 @@
 <img id="plot" src="">
 
 <script>
-
 const BASE_URL =
   "https://pub-7819f05640674537af897dbdd15c5d0c.r2.dev";
 
-const params = new URLSearchParams(window.location.search);
+const params =
+  new URLSearchParams(window.location.search);
 
 let selectedModel =
   params.get("model") || "hrrr";
@@ -207,12 +199,9 @@ function getProductPath() {
 
 
 function updateTitle() {
-
-  const upper =
-    selectedModel.toUpperCase();
-
   viewerTitle.textContent =
-    upper + " Reflectivity / UH";
+    selectedModel.toUpperCase() +
+    " Reflectivity / UH";
 }
 
 
@@ -221,16 +210,19 @@ function fhrName(fhr) {
 }
 
 
-function imgSrc(fhr) {
+function getFilePrefix() {
+  return selectedModel + "_lbf_f";
+}
 
-  if (!selectedRun)
-    return "";
+
+function imgSrc(fhr) {
+  if (!selectedRun) return "";
 
   return BASE_URL +
     getProductPath() + "/" +
     selectedRun + "/" +
     selectedDomain + "/" +
-    "hrrr_lbf_f" +
+    getFilePrefix() +
     fhrName(fhr) +
     ".png?t=" +
     Date.now();
@@ -238,9 +230,7 @@ function imgSrc(fhr) {
 
 
 async function loadRunsJson() {
-
   try {
-
     const response =
       await fetch(
         BASE_URL +
@@ -256,57 +246,110 @@ async function loadRunsJson() {
       data.runs || [];
 
   } catch (e) {
-
-    console.warn(
-      "Could not load runs.json",
-      e
-    );
-
+    console.warn("Could not load runs.json", e);
     runs = [];
   }
 }
 
 
-function populateRunDropdown() {
+function runId(run) {
+  if (typeof run === "string") {
+    return run;
+  }
 
+  return run.id;
+}
+
+
+function runLabel(run) {
+  if (typeof run === "string") {
+    return run.replace("_", " ");
+  }
+
+  return run.label || run.id;
+}
+
+
+function getRunObjById(id) {
+  return runs.find(run => runId(run) === id);
+}
+
+
+function updateMaxFhrForRun() {
+  const runObj =
+    getRunObjById(selectedRun);
+
+  if (
+    runObj &&
+    typeof runObj !== "string" &&
+    runObj.max_fhr !== undefined
+  ) {
+    maxFhr =
+      Number(runObj.max_fhr);
+  }
+  else {
+    const hourText =
+      selectedRun.split("_")[1] || "";
+
+    const hour =
+      Number(hourText.replace("z", ""));
+
+    maxFhr =
+      [0, 6, 12, 18].includes(hour)
+      ? 48
+      : 18;
+  }
+
+  slider.max =
+    maxFhr;
+
+  buildHourButtons();
+}
+
+
+function populateRunDropdown() {
   const oldRun =
     selectedRun;
 
   runSelect.innerHTML = "";
 
   runs.forEach(run => {
-
     const opt =
       document.createElement("option");
 
-    opt.value = run;
-    opt.textContent = run;
+    opt.value =
+      runId(run);
+
+    opt.textContent =
+      runLabel(run);
 
     runSelect.appendChild(opt);
-
   });
 
-  if (runs.includes(oldRun)) {
+  const runIds =
+    runs.map(run => runId(run));
+
+  if (runIds.includes(oldRun)) {
     selectedRun = oldRun;
   }
   else {
-    selectedRun = runs[0] || "";
+    selectedRun = runIds[0] || "";
   }
 
   runSelect.value =
     selectedRun;
+
+  updateMaxFhrForRun();
 }
 
 
 function buildHourButtons() {
-
   tiles.innerHTML = "";
 
   slider.max =
     maxFhr;
 
   for (let i = 0; i <= maxFhr; i++) {
-
     const btn =
       document.createElement("button");
 
@@ -328,7 +371,6 @@ function buildHourButtons() {
 
 
 function setFrame(fhr) {
-
   current =
     Math.max(
       0,
@@ -344,8 +386,9 @@ function setFrame(fhr) {
   const src =
     imgSrc(current);
 
-  if (src)
+  if (src) {
     plot.src = src;
+  }
 
   document
     .querySelectorAll(".frame")
@@ -358,20 +401,18 @@ function setFrame(fhr) {
       "btn" + current
     );
 
-  if (active)
+  if (active) {
     active.classList.add("active");
+  }
 }
 
 
 function refreshHourAvailability() {
-
   for (let i = 0; i <= maxFhr; i++) {
-
     const btn =
       document.getElementById("btn" + i);
 
-    if (!btn)
-      continue;
+    if (!btn) continue;
 
     btn.classList.remove(
       "available",
@@ -385,17 +426,13 @@ function refreshHourAvailability() {
 
     testImg.onload =
       function() {
-
         btn.classList.remove("missing");
-
         btn.classList.add("available");
       };
 
     testImg.onerror =
       function() {
-
         btn.classList.remove("available");
-
         btn.classList.add("missing");
       };
 
@@ -406,11 +443,12 @@ function refreshHourAvailability() {
 
 
 function changeRun() {
-
   selectedRun =
     runSelect.value;
 
   current = 0;
+
+  updateMaxFhrForRun();
 
   refreshHourAvailability();
 
@@ -419,7 +457,6 @@ function changeRun() {
 
 
 function changeDomain() {
-
   selectedDomain =
     domainSelect.value;
 
@@ -430,14 +467,17 @@ function changeDomain() {
 
 
 function latestRun() {
-
   selectedRun =
-    runs[0] || "";
+    runs.length > 0
+    ? runId(runs[0])
+    : "";
 
   runSelect.value =
     selectedRun;
 
   current = 0;
+
+  updateMaxFhrForRun();
 
   refreshHourAvailability();
 
@@ -446,28 +486,23 @@ function latestRun() {
 
 
 function togglePlay() {
-
   playing = !playing;
 
   if (playing) {
-
     playBtn.textContent =
       "⏸ Pause";
 
-    timer = setInterval(() => {
+    timer =
+      setInterval(() => {
+        current =
+          current >= maxFhr
+          ? 0
+          : current + 1;
 
-      current =
-        current >= maxFhr
-        ? 0
-        : current + 1;
-
-      setFrame(current);
-
-    }, 650);
-
+        setFrame(current);
+      }, 650);
   }
   else {
-
     playBtn.textContent =
       "▶ Play";
 
@@ -478,13 +513,11 @@ function togglePlay() {
 
 slider.oninput =
   function() {
-
     setFrame(slider.value);
   };
 
 
 async function refreshViewer() {
-
   await loadRunsJson();
 
   populateRunDropdown();
@@ -494,29 +527,23 @@ async function refreshViewer() {
 
 
 async function init() {
-
   updateTitle();
 
   await loadRunsJson();
 
   populateRunDropdown();
 
-  buildHourButtons();
-
   refreshHourAvailability();
 
   setFrame(0);
 
   setInterval(async () => {
-
     await refreshViewer();
-
   }, 30000);
 }
 
 
 init();
-
 </script>
 
 </body>
