@@ -175,10 +175,7 @@
   </span>
 
   Product:
-  <select id="productSelect" onchange="changeProduct()">
-    <option value="refl_uh">Reflectivity/UH</option>
-    <option value="hail_swath">Hail Swath</option>
-  </select>
+  <select id="productSelect" onchange="changeProduct()"></select>
 
   &nbsp;&nbsp;
 
@@ -248,7 +245,42 @@ const viewerTitle = document.getElementById("viewerTitle");
 
 modelSelect.value = selectedModel;
 memberSelect.value = selectedMember;
-productSelect.value = selectedProduct;
+
+function addProductOption(value, label) {
+  const opt = document.createElement("option");
+  opt.value = value;
+  opt.textContent = label;
+  productSelect.appendChild(opt);
+}
+
+function updateProductOptions() {
+  productSelect.innerHTML = "";
+
+  if (selectedModel === "hrrr") {
+    addProductOption("refl_uh", "Reflectivity/UH");
+    addProductOption("hail_swath", "Hail Swath");
+    addProductOption("max_uh_02", "Max 0-2 km UH");
+  }
+
+  else if (selectedModel === "rrfs") {
+    addProductOption("refl_uh", "Reflectivity/UH");
+    addProductOption("hail_swath", "Hail Swath");
+  }
+
+  else if (selectedModel === "refs") {
+    addProductOption("refl_uh", "Reflectivity/UH");
+    addProductOption("hail_swath", "Hail Swath");
+  }
+
+  const values =
+    Array.from(productSelect.options).map(o => o.value);
+
+  if (!values.includes(selectedProduct)) {
+    selectedProduct = values[0];
+  }
+
+  productSelect.value = selectedProduct;
+}
 
 function getProductPath() {
   if (selectedModel === "refs") {
@@ -264,6 +296,7 @@ function getProductPath() {
 
 function productLabel() {
   if (selectedProduct === "hail_swath") return "Hail Swath";
+  if (selectedProduct === "max_uh_02") return "Max 0-2 km UH";
   if (selectedProduct === "refl_uh") return "Reflectivity / UH";
   return selectedProduct;
 }
@@ -304,6 +337,10 @@ function getFileName(fhr) {
 
   if (selectedProduct === "hail_swath") {
     return selectedModel + "_hail_swath_f" + f + ".png";
+  }
+
+  if (selectedProduct === "max_uh_02") {
+    return selectedModel + "_max_uh_02_f" + f + ".png";
   }
 
   return selectedModel + "_lbf_f" + f + ".png";
@@ -524,6 +561,7 @@ async function changeModel() {
   plot.src = "";
 
   updateMemberVisibility();
+  updateProductOptions();
   updateTitle();
 
   await refreshViewer();
@@ -631,6 +669,7 @@ async function refreshViewer() {
 
 async function init() {
   updateMemberVisibility();
+  updateProductOptions();
   updateTitle();
 
   await loadRunsJson();
