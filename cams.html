@@ -1,9 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf-8">
+
   <title>CAMs Viewer</title>
 
   <style>
+
     body {
       margin: 0;
       background: #111;
@@ -95,6 +98,10 @@
       min-width: 150px;
     }
 
+    #memberBlock {
+      display: none;
+    }
+
     .controls {
       display: grid;
       grid-template-columns: auto auto 1fr auto;
@@ -149,6 +156,7 @@
       border: 1px solid #333;
       background: #000;
     }
+
   </style>
 </head>
 
@@ -216,10 +224,19 @@
 </div>
 
 <div class="controls">
-  <button onclick="togglePlay()" id="playBtn">▶ Play</button>
-  <button onclick="latestRun()">Latest</button>
-  <input id="slider" type="range" min="0" max="18" value="0">
+
+  <button onclick="togglePlay()" id="playBtn">
+    ▶ Play
+  </button>
+
+  <button onclick="latestRun()">
+    Latest
+  </button>
+
+  <input id="slider" type="range" min="0" max="48" value="0">
+
   <div id="fhrLabel">000</div>
+
 </div>
 
 <div class="tiles" id="tiles"></div>
@@ -245,34 +262,80 @@ let selectedMember =
 let selectedProduct =
   params.get("product") || "refl_uh";
 
-let runs = [];
 let selectedRun = "";
+
 let selectedDomain = "regional";
+
 let current = 0;
-let maxFhr = 18;
+
+let maxFhr = 48;
+
+let availableFrames = [];
+
 let playing = false;
+
 let timer = null;
 
-const modelSelect = document.getElementById("modelSelect");
-const memberSelect = document.getElementById("memberSelect");
-const productSelect = document.getElementById("productSelect");
-const memberBlock = document.getElementById("memberBlock");
-const runSelect = document.getElementById("runSelect");
-const domainSelect = document.getElementById("domainSelect");
-const plot = document.getElementById("plot");
-const slider = document.getElementById("slider");
-const tiles = document.getElementById("tiles");
-const fhrLabel = document.getElementById("fhrLabel");
-const playBtn = document.getElementById("playBtn");
-const viewerTitle = document.getElementById("viewerTitle");
+let runs = [];
+
+const modelSelect =
+  document.getElementById("modelSelect");
+
+const memberSelect =
+  document.getElementById("memberSelect");
+
+const memberBlock =
+  document.getElementById("memberBlock");
+
+const productSelect =
+  document.getElementById("productSelect");
+
+const runSelect =
+  document.getElementById("runSelect");
+
+const domainSelect =
+  document.getElementById("domainSelect");
+
+const slider =
+  document.getElementById("slider");
+
+const plot =
+  document.getElementById("plot");
+
+const tiles =
+  document.getElementById("tiles");
+
+const fhrLabel =
+  document.getElementById("fhrLabel");
+
+const playBtn =
+  document.getElementById("playBtn");
+
+const viewerTitle =
+  document.getElementById("viewerTitle");
 
 modelSelect.value = selectedModel;
 memberSelect.value = selectedMember;
 
+function updateMemberVisibility() {
+
+  if (selectedModel === "refs") {
+    memberBlock.style.display = "inline-flex";
+  }
+
+  else {
+    memberBlock.style.display = "none";
+  }
+}
+
 function addProductOption(value, label) {
-  const opt = document.createElement("option");
+
+  const opt =
+    document.createElement("option");
+
   opt.value = value;
   opt.textContent = label;
+
   productSelect.appendChild(opt);
 }
 
@@ -281,45 +344,81 @@ function updateProductOptions() {
   productSelect.innerHTML = "";
 
   if (selectedModel === "hrrr") {
-    addProductOption("refl_uh", "Reflectivity/UH");
-    addProductOption("hail_swath", "Hail Swath");
-    addProductOption("max_uh_02", "Max 0-2 km UH");
+
+    addProductOption(
+      "refl_uh",
+      "Reflectivity/UH"
+    );
+
+    addProductOption(
+      "hail_swath",
+      "Hail Swath"
+    );
+
+    addProductOption(
+      "max_uh_02",
+      "Max 0-2 km UH"
+    );
   }
 
   else if (selectedModel === "rrfs") {
-    addProductOption("refl_uh", "Reflectivity/UH");
-    addProductOption("hail_swath", "Hail Swath");
+
+    addProductOption(
+      "refl_uh",
+      "Reflectivity/UH"
+    );
+
+    addProductOption(
+      "hail_swath",
+      "Hail Swath"
+    );
   }
 
   else if (selectedModel === "refs") {
-    addProductOption("refl_uh", "Reflectivity/UH");
-    addProductOption("hail_swath", "Hail Swath");
-  }
 
-  const values =
-    Array.from(productSelect.options).map(o => o.value);
-
-  if (!values.includes(selectedProduct)) {
-    selectedProduct = values[0];
+    addProductOption(
+      "refl_uh",
+      "Reflectivity/UH"
+    );
   }
 
   productSelect.value = selectedProduct;
 }
 
-function updateMemberVisibility() {
-  memberBlock.style.display =
-    selectedModel === "refs"
-    ? "inline"
-    : "none";
+function updateTitle() {
+
+  let modelLabel =
+    selectedModel.toUpperCase();
+
+  if (selectedModel === "refs") {
+    modelLabel =
+      `REFS ${selectedMember.toUpperCase()}`;
+  }
+
+  let productLabel =
+    productSelect.options[
+      productSelect.selectedIndex
+    ]?.text || "";
+
+  viewerTitle.textContent =
+    `${modelLabel} ${productLabel}`;
 }
 
 function getProductPath() {
 
   if (selectedModel === "refs") {
-    return `/runs/cams/refs/${selectedMember}/${selectedProduct}`;
+
+    return (
+      `/runs/cams/refs/` +
+      `${selectedMember}/` +
+      `${selectedProduct}`
+    );
   }
 
-  return `/runs/cams/${selectedModel}/${selectedProduct}`;
+  return (
+    `/runs/cams/${selectedModel}/` +
+    `${selectedProduct}`
+  );
 }
 
 function getFileName(fhr) {
@@ -329,22 +428,32 @@ function getFileName(fhr) {
 
   if (selectedModel === "refs") {
 
-    if (selectedProduct === "hail_swath") {
-      return `refs_${selectedMember}_hail_swath_f${f}.png`;
-    }
-
-    return `refs_${selectedMember}_lbf_f${f}.png`;
+    return (
+      `refs_${selectedMember}` +
+      `_lbf_f${f}.png`
+    );
   }
 
   if (selectedProduct === "hail_swath") {
-    return `${selectedModel}_hail_swath_f${f}.png`;
+
+    return (
+      `${selectedModel}` +
+      `_hail_swath_f${f}.png`
+    );
   }
 
   if (selectedProduct === "max_uh_02") {
-    return `${selectedModel}_max_uh_02_f${f}.png`;
+
+    return (
+      `${selectedModel}` +
+      `_max_uh_02_f${f}.png`
+    );
   }
 
-  return `${selectedModel}_lbf_f${f}.png`;
+  return (
+    `${selectedModel}` +
+    `_lbf_f${f}.png`
+  );
 }
 
 function imgSrc(fhr) {
@@ -364,6 +473,282 @@ function imgSrc(fhr) {
     Date.now()
   );
 }
+
+async function loadRunsJson() {
+
+  let runsPath;
+
+  if (selectedModel === "refs") {
+
+    runsPath =
+      `${BASE_URL}/runs/cams/refs/` +
+      `${selectedMember}/` +
+      `${selectedProduct}/runs.json`;
+  }
+
+  else {
+
+    runsPath =
+      `${BASE_URL}/runs/cams/` +
+      `${selectedModel}/` +
+      `${selectedProduct}/runs.json`;
+  }
+
+  try {
+
+    const response =
+      await fetch(runsPath);
+
+    runs =
+      await response.json();
+
+    if (runs.length > 0) {
+      selectedRun = runs[0];
+    }
+  }
+
+  catch(err) {
+    console.error(err);
+  }
+}
+
+function populateRunDropdown() {
+
+  runSelect.innerHTML = "";
+
+  runs.forEach(run => {
+
+    const opt =
+      document.createElement("option");
+
+    opt.value = run;
+    opt.textContent = run;
+
+    runSelect.appendChild(opt);
+  });
+
+  runSelect.value = selectedRun;
+}
+
+async function refreshHourAvailability() {
+
+  tiles.innerHTML = "";
+
+  availableFrames = [];
+
+  maxFhr =
+    selectedProduct === "hail_swath"
+    ? 48
+    : 18;
+
+  slider.max = maxFhr;
+
+  for (let f = 0; f <= maxFhr; f++) {
+
+    const button =
+      document.createElement("button");
+
+    button.className =
+      "frame missing";
+
+    button.textContent =
+      String(f).padStart(3, "0");
+
+    button.disabled = true;
+
+    try {
+
+      const response =
+        await fetch(imgSrc(f), {
+          method: "HEAD"
+        });
+
+      if (response.ok) {
+
+        availableFrames.push(f);
+
+        button.disabled = false;
+
+        button.className =
+          "frame available";
+
+        button.onclick = () => {
+          setFrame(f);
+        };
+      }
+    }
+
+    catch(err) {}
+
+    tiles.appendChild(button);
+  }
+}
+
+function firstAvailableFrame() {
+
+  if (availableFrames.length === 0) {
+    return 0;
+  }
+
+  return availableFrames[0];
+}
+
+function setFrame(fhr) {
+
+  current = fhr;
+
+  slider.value = current;
+
+  fhrLabel.textContent =
+    String(current).padStart(3, "0");
+
+  plot.src =
+    imgSrc(current);
+
+  document.querySelectorAll(".frame")
+    .forEach((btn, idx) => {
+
+      btn.classList.remove("active");
+
+      if (idx === current) {
+        btn.classList.add("active");
+      }
+    });
+}
+
+slider.addEventListener("input", () => {
+  setFrame(parseInt(slider.value));
+});
+
+function togglePlay() {
+
+  playing = !playing;
+
+  playBtn.textContent =
+    playing
+    ? "⏸ Pause"
+    : "▶ Play";
+
+  if (!playing) {
+
+    clearInterval(timer);
+    return;
+  }
+
+  timer = setInterval(() => {
+
+    let idx =
+      availableFrames.indexOf(current);
+
+    idx++;
+
+    if (idx >= availableFrames.length) {
+      idx = 0;
+    }
+
+    setFrame(availableFrames[idx]);
+
+  }, 700);
+}
+
+async function refreshViewer() {
+
+  await loadRunsJson();
+
+  populateRunDropdown();
+
+  await refreshHourAvailability();
+}
+
+async function latestRun() {
+
+  await refreshViewer();
+
+  setFrame(firstAvailableFrame());
+}
+
+async function changeModel() {
+
+  selectedModel =
+    modelSelect.value;
+
+  updateMemberVisibility();
+
+  updateProductOptions();
+
+  updateTitle();
+
+  await refreshViewer();
+
+  setFrame(firstAvailableFrame());
+}
+
+async function changeMember() {
+
+  selectedMember =
+    memberSelect.value;
+
+  updateTitle();
+
+  await refreshViewer();
+
+  setFrame(firstAvailableFrame());
+}
+
+async function changeProduct() {
+
+  selectedProduct =
+    productSelect.value;
+
+  updateTitle();
+
+  await refreshViewer();
+
+  setFrame(firstAvailableFrame());
+}
+
+async function changeRun() {
+
+  selectedRun =
+    runSelect.value;
+
+  await refreshHourAvailability();
+
+  setFrame(firstAvailableFrame());
+}
+
+async function changeDomain() {
+
+  selectedDomain =
+    domainSelect.value;
+
+  await refreshHourAvailability();
+
+  setFrame(firstAvailableFrame());
+}
+
+async function init() {
+
+  updateMemberVisibility();
+
+  updateProductOptions();
+
+  updateTitle();
+
+  await loadRunsJson();
+
+  populateRunDropdown();
+
+  await refreshHourAvailability();
+
+  setFrame(firstAvailableFrame());
+
+  setInterval(async () => {
+    await refreshViewer();
+  }, 30000);
+}
+
+init();
 
 </script>
 
