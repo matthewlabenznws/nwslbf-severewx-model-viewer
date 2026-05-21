@@ -60,8 +60,14 @@
 
     .topbar {
       background: #1b1b1b;
-      padding: 10px;
+      padding: 10px 14px;
       border-bottom: 1px solid #444;
+
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
     }
 
     select, button {
@@ -71,6 +77,22 @@
       padding: 6px 10px;
       border-radius: 3px;
       font-weight: bold;
+    }
+
+    .topbar label {
+      font-weight: bold;
+    }
+
+    .topbar select {
+      min-width: 120px;
+    }
+
+    #runSelect {
+      min-width: 170px;
+    }
+
+    #domainSelect {
+      min-width: 150px;
     }
 
     .controls {
@@ -123,7 +145,7 @@
 
     #plot {
       max-width: 98vw;
-      max-height: calc(100vh - 245px);
+      max-height: calc(100vh - 320px);
       border: 1px solid #333;
       background: #000;
     }
@@ -149,21 +171,21 @@
 </div>
 
 <div class="topbar">
+
   <b id="viewerTitle">HRRR Reflectivity / UH</b>
 
-  &nbsp;&nbsp;
+  <label>Model:</label>
 
-  Model:
   <select id="modelSelect" onchange="changeModel()">
     <option value="hrrr">HRRR</option>
     <option value="rrfs">RRFS</option>
     <option value="refs">REFS</option>
   </select>
 
-  &nbsp;&nbsp;
-
   <span id="memberBlock">
-    Member:
+
+    <label>Member:</label>
+
     <select id="memberSelect" onchange="changeMember()">
       <option value="m01">M01</option>
       <option value="m02">M02</option>
@@ -171,26 +193,26 @@
       <option value="m04">M04</option>
       <option value="m05">M05</option>
     </select>
-    &nbsp;&nbsp;
+
   </span>
 
-  Product:
+  <label>Product:</label>
+
   <select id="productSelect" onchange="changeProduct()"></select>
 
-  &nbsp;&nbsp;
+  <label>Run:</label>
 
-  Run:
   <select id="runSelect" onchange="changeRun()"></select>
 
-  &nbsp;&nbsp;
+  <label>Domain:</label>
 
-  Domain:
   <select id="domainSelect" onchange="changeDomain()">
     <option value="regional">Regional</option>
     <option value="lbf">LBF</option>
     <option value="central_plains">Central Plains</option>
     <option value="spc_severe">SPC Severe</option>
   </select>
+
 </div>
 
 <div class="controls">
@@ -207,8 +229,10 @@
 <img id="plot" src="">
 
 <script>
+
 const BASE_URL =
   "https://data.nwslbfmtlsvrwx.com";
+
 const params =
   new URLSearchParams(window.location.search);
 
@@ -253,6 +277,7 @@ function addProductOption(value, label) {
 }
 
 function updateProductOptions() {
+
   productSelect.innerHTML = "";
 
   if (selectedModel === "hrrr") {
@@ -281,410 +306,65 @@ function updateProductOptions() {
   productSelect.value = selectedProduct;
 }
 
-function getProductPath() {
-  if (selectedModel === "refs") {
-    return "/runs/cams/refs/" +
-      selectedMember + "/" +
-      selectedProduct;
-  }
-
-  return "/runs/cams/" +
-    selectedModel + "/" +
-    selectedProduct;
-}
-
-function productLabel() {
-  if (selectedProduct === "hail_swath") return "Hail Swath";
-  if (selectedProduct === "max_uh_02") return "Max 0-2 km UH";
-  if (selectedProduct === "refl_uh") return "Reflectivity / UH";
-  return selectedProduct;
-}
-
-function updateTitle() {
-  let modelLabel = selectedModel.toUpperCase();
-
-  if (selectedModel === "refs") {
-    modelLabel = "REFS " + selectedMember.toUpperCase();
-  }
-
-  viewerTitle.textContent =
-    modelLabel + " " + productLabel();
-}
-
 function updateMemberVisibility() {
-  if (selectedModel === "refs") {
-    memberBlock.style.display = "inline";
-  } else {
-    memberBlock.style.display = "none";
-  }
+  memberBlock.style.display =
+    selectedModel === "refs"
+    ? "inline"
+    : "none";
 }
 
-function fhrName(fhr) {
-  return String(fhr).padStart(3, "0");
+function getProductPath() {
+
+  if (selectedModel === "refs") {
+    return `/runs/cams/refs/${selectedMember}/${selectedProduct}`;
+  }
+
+  return `/runs/cams/${selectedModel}/${selectedProduct}`;
 }
 
 function getFileName(fhr) {
-  const f = fhrName(fhr);
+
+  const f =
+    String(fhr).padStart(3, "0");
 
   if (selectedModel === "refs") {
+
     if (selectedProduct === "hail_swath") {
-      return "refs_" + selectedMember + "_hail_swath_f" + f + ".png";
+      return `refs_${selectedMember}_hail_swath_f${f}.png`;
     }
 
-    return "refs_" + selectedMember + "_lbf_f" + f + ".png";
+    return `refs_${selectedMember}_lbf_f${f}.png`;
   }
 
   if (selectedProduct === "hail_swath") {
-    return selectedModel + "_hail_swath_f" + f + ".png";
+    return `${selectedModel}_hail_swath_f${f}.png`;
   }
 
   if (selectedProduct === "max_uh_02") {
-    return selectedModel + "_max_uh_02_f" + f + ".png";
+    return `${selectedModel}_max_uh_02_f${f}.png`;
   }
 
-  return selectedModel + "_lbf_f" + f + ".png";
+  return `${selectedModel}_lbf_f${f}.png`;
 }
 
 function imgSrc(fhr) {
+
   if (!selectedRun) return "";
 
-  return BASE_URL +
-    getProductPath() + "/" +
-    selectedRun + "/" +
-    selectedDomain + "/" +
+  return (
+    BASE_URL +
+    getProductPath() +
+    "/" +
+    selectedRun +
+    "/" +
+    selectedDomain +
+    "/" +
     getFileName(fhr) +
     "?t=" +
-    Date.now();
+    Date.now()
+  );
 }
 
-async function loadRunsJson() {
-  try {
-    const response =
-      await fetch(
-        BASE_URL +
-        getProductPath() +
-        "/runs.json?t=" +
-        Date.now()
-      );
-
-    const data = await response.json();
-    runs = data.runs || [];
-
-  } catch (e) {
-    console.warn("Could not load runs.json", e);
-    runs = [];
-  }
-}
-
-function runId(run) {
-  if (typeof run === "string") return run;
-  return run.id;
-}
-
-function runLabel(run) {
-  if (typeof run === "string") return run.replace("_", " ");
-  return run.label || run.id;
-}
-
-function getRunObjById(id) {
-  return runs.find(run => runId(run) === id);
-}
-
-function updateMaxFhrForRun() {
-  const runObj = getRunObjById(selectedRun);
-
-  if (
-    runObj &&
-    typeof runObj !== "string" &&
-    runObj.max_fhr !== undefined
-  ) {
-    maxFhr = Number(runObj.max_fhr);
-  } else {
-    const hourText = selectedRun.split("_")[1] || "";
-    const hour = Number(hourText.replace("z", ""));
-
-    maxFhr =
-      [0, 6, 12, 18].includes(hour)
-      ? 48
-      : 18;
-  }
-
-  slider.max = maxFhr;
-  buildHourButtons();
-}
-
-function populateRunDropdown() {
-  const oldRun = selectedRun;
-  runSelect.innerHTML = "";
-
-  runs.forEach(run => {
-    const opt = document.createElement("option");
-    opt.value = runId(run);
-    opt.textContent = runLabel(run);
-    runSelect.appendChild(opt);
-  });
-
-  const runIds = runs.map(run => runId(run));
-
-  if (runIds.includes(oldRun)) {
-    selectedRun = oldRun;
-  } else {
-    selectedRun = runIds[0] || "";
-  }
-
-  runSelect.value = selectedRun;
-  updateMaxFhrForRun();
-}
-
-function buildHourButtons() {
-  tiles.innerHTML = "";
-  slider.max = maxFhr;
-
-  for (let i = 0; i <= maxFhr; i++) {
-    const btn = document.createElement("button");
-
-    btn.className = "frame missing";
-    btn.id = "btn" + i;
-    btn.textContent = fhrName(i);
-    btn.disabled = true;
-
-    btn.onclick = () => {
-      if (!btn.classList.contains("available")) return;
-      setFrame(i);
-    };
-
-    tiles.appendChild(btn);
-  }
-}
-
-function setFrame(fhr) {
-  const target = Number(fhr);
-  const btn = document.getElementById("btn" + target);
-
-  if (btn && !btn.classList.contains("available")) {
-    return;
-  }
-
-  current =
-    Math.max(
-      0,
-      Math.min(maxFhr, target)
-    );
-
-  slider.value = current;
-  fhrLabel.textContent = fhrName(current);
-
-  const src = imgSrc(current);
-
-  if (src) {
-    plot.src = src;
-  }
-
-  document
-    .querySelectorAll(".frame")
-    .forEach(btn => btn.classList.remove("active"));
-
-  const active =
-    document.getElementById("btn" + current);
-
-  if (active) {
-    active.classList.add("active");
-  }
-}
-
-function refreshHourAvailability() {
-  for (let i = 0; i <= maxFhr; i++) {
-    const btn = document.getElementById("btn" + i);
-    if (!btn) continue;
-
-    btn.classList.remove("available", "missing");
-    btn.classList.add("missing");
-    btn.disabled = true;
-
-    const testImg = new Image();
-
-    testImg.onload = function() {
-      btn.classList.remove("missing");
-      btn.classList.add("available");
-      btn.disabled = false;
-    };
-
-    testImg.onerror = function() {
-      btn.classList.remove("available");
-      btn.classList.add("missing");
-      btn.disabled = true;
-    };
-
-    testImg.src = imgSrc(i);
-  }
-}
-
-function firstAvailableFrame() {
-  for (let i = 0; i <= maxFhr; i++) {
-    const btn = document.getElementById("btn" + i);
-    if (btn && btn.classList.contains("available")) {
-      return i;
-    }
-  }
-
-  return 0;
-}
-
-function changeRun() {
-  selectedRun = runSelect.value;
-  current = 0;
-
-  updateMaxFhrForRun();
-  refreshHourAvailability();
-
-  setTimeout(() => {
-    setFrame(firstAvailableFrame());
-  }, 400);
-}
-
-function changeDomain() {
-  selectedDomain = domainSelect.value;
-
-  refreshHourAvailability();
-
-  setTimeout(() => {
-    setFrame(firstAvailableFrame());
-  }, 400);
-}
-
-async function changeModel() {
-  selectedModel = modelSelect.value;
-  selectedMember = memberSelect.value;
-  current = 0;
-  selectedRun = "";
-  plot.src = "";
-
-  updateMemberVisibility();
-  updateProductOptions();
-  updateTitle();
-
-  await refreshViewer();
-
-  setTimeout(() => {
-    setFrame(firstAvailableFrame());
-  }, 400);
-}
-
-async function changeMember() {
-  selectedMember = memberSelect.value;
-  current = 0;
-  selectedRun = "";
-  plot.src = "";
-
-  updateTitle();
-
-  await refreshViewer();
-
-  setTimeout(() => {
-    setFrame(firstAvailableFrame());
-  }, 400);
-}
-
-async function changeProduct() {
-  selectedProduct = productSelect.value;
-  current = 0;
-  selectedRun = "";
-  plot.src = "";
-
-  updateTitle();
-
-  await refreshViewer();
-
-  setTimeout(() => {
-    setFrame(firstAvailableFrame());
-  }, 400);
-}
-
-function latestRun() {
-  selectedRun =
-    runs.length > 0
-    ? runId(runs[0])
-    : "";
-
-  runSelect.value = selectedRun;
-  current = 0;
-
-  updateMaxFhrForRun();
-  refreshHourAvailability();
-
-  setTimeout(() => {
-    setFrame(firstAvailableFrame());
-  }, 400);
-}
-
-function togglePlay() {
-  playing = !playing;
-
-  if (playing) {
-    playBtn.textContent = "⏸ Pause";
-
-    timer =
-      setInterval(() => {
-        let next = current + 1;
-
-        for (let tries = 0; tries <= maxFhr; tries++) {
-          if (next > maxFhr) next = 0;
-
-          const btn = document.getElementById("btn" + next);
-
-          if (btn && btn.classList.contains("available")) {
-            setFrame(next);
-            return;
-          }
-
-          next++;
-        }
-
-      }, 650);
-
-  } else {
-    playBtn.textContent = "▶ Play";
-    clearInterval(timer);
-  }
-}
-
-slider.oninput =
-  function() {
-    const target = Number(slider.value);
-    const btn = document.getElementById("btn" + target);
-
-    if (btn && btn.classList.contains("available")) {
-      setFrame(target);
-    } else {
-      slider.value = current;
-    }
-  };
-
-async function refreshViewer() {
-  await loadRunsJson();
-  populateRunDropdown();
-  refreshHourAvailability();
-}
-
-async function init() {
-  updateMemberVisibility();
-  updateProductOptions();
-  updateTitle();
-
-  await loadRunsJson();
-  populateRunDropdown();
-  refreshHourAvailability();
-
-  setTimeout(() => {
-    setFrame(firstAvailableFrame());
-  }, 400);
-
-  setInterval(async () => {
-    await refreshViewer();
-  }, 30000);
-}
-
-init();
 </script>
 
 </body>
