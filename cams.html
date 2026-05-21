@@ -2,11 +2,9 @@
 <html>
 <head>
   <meta charset="utf-8">
-
   <title>CAMs Viewer</title>
 
   <style>
-
     body {
       margin: 0;
       background: #111;
@@ -15,49 +13,35 @@
       text-align: center;
     }
 
+    .navbar, .subbar {
+      text-align: left;
+      font-weight: bold;
+      border-bottom: 1px solid #333;
+    }
+
     .navbar {
       background: #1a1a1a;
       padding: 12px 18px;
-      border-bottom: 1px solid #333;
-      text-align: left;
       font-size: 20px;
-      font-weight: bold;
-    }
-
-    .navbar a {
-      color: white;
-      text-decoration: none;
-      margin: 0 6px;
-    }
-
-    .navbar a:hover {
-      color: #6ea8ff;
-    }
-
-    .navbar span {
-      color: #777;
     }
 
     .subbar {
       background: #151515;
       padding: 9px 18px;
-      border-bottom: 1px solid #333;
-      text-align: left;
       font-size: 16px;
-      font-weight: bold;
     }
 
-    .subbar a {
+    .navbar a, .subbar a {
       color: white;
       text-decoration: none;
       margin: 0 6px;
     }
 
-    .subbar a:hover {
+    .navbar a:hover, .subbar a:hover {
       color: #6ea8ff;
     }
 
-    .subbar span {
+    .navbar span, .subbar span {
       color: #777;
     }
 
@@ -65,7 +49,6 @@
       background: #1b1b1b;
       padding: 10px 14px;
       border-bottom: 1px solid #444;
-
       display: flex;
       flex-wrap: wrap;
       align-items: center;
@@ -156,7 +139,6 @@
       border: 1px solid #333;
       background: #000;
     }
-
   </style>
 </head>
 
@@ -180,10 +162,9 @@
 
 <div class="topbar">
 
-  <b id="viewerTitle">HRRR Reflectivity / UH</b>
+  <b id="viewerTitle">HRRR Reflectivity/UH</b>
 
   <label>Model:</label>
-
   <select id="modelSelect" onchange="changeModel()">
     <option value="hrrr">HRRR</option>
     <option value="rrfs">RRFS</option>
@@ -191,9 +172,7 @@
   </select>
 
   <span id="memberBlock">
-
     <label>Member:</label>
-
     <select id="memberSelect" onchange="changeMember()">
       <option value="m01">M01</option>
       <option value="m02">M02</option>
@@ -201,19 +180,15 @@
       <option value="m04">M04</option>
       <option value="m05">M05</option>
     </select>
-
   </span>
 
   <label>Product:</label>
-
   <select id="productSelect" onchange="changeProduct()"></select>
 
   <label>Run:</label>
-
   <select id="runSelect" onchange="changeRun()"></select>
 
   <label>Domain:</label>
-
   <select id="domainSelect" onchange="changeDomain()">
     <option value="regional">Regional</option>
     <option value="lbf">LBF</option>
@@ -224,19 +199,10 @@
 </div>
 
 <div class="controls">
-
-  <button onclick="togglePlay()" id="playBtn">
-    ▶ Play
-  </button>
-
-  <button onclick="latestRun()">
-    Latest
-  </button>
-
+  <button onclick="togglePlay()" id="playBtn">▶ Play</button>
+  <button onclick="latestRun()">Latest</button>
   <input id="slider" type="range" min="0" max="48" value="0">
-
   <div id="fhrLabel">000</div>
-
 </div>
 
 <div class="tiles" id="tiles"></div>
@@ -246,218 +212,123 @@
 <img id="plot" src="">
 
 <script>
+const BASE_URL = "https://data.nwslbfmtlsvrwx.com";
 
-const BASE_URL =
-  "https://data.nwslbfmtlsvrwx.com";
+const params = new URLSearchParams(window.location.search);
 
-const params =
-  new URLSearchParams(window.location.search);
-
-let selectedModel =
-  params.get("model") || "hrrr";
-
-let selectedMember =
-  params.get("member") || "m01";
-
-let selectedProduct =
-  params.get("product") || "refl_uh";
+let selectedModel = params.get("model") || "hrrr";
+let selectedMember = params.get("member") || "m01";
+let selectedProduct = params.get("product") || "refl_uh";
 
 let selectedRun = "";
-
 let selectedDomain = "regional";
-
 let current = 0;
-
-let maxFhr = 48;
-
+let maxFhr = 18;
 let availableFrames = [];
-
 let playing = false;
-
 let timer = null;
-
 let runs = [];
 
-const modelSelect =
-  document.getElementById("modelSelect");
-
-const memberSelect =
-  document.getElementById("memberSelect");
-
-const memberBlock =
-  document.getElementById("memberBlock");
-
-const productSelect =
-  document.getElementById("productSelect");
-
-const runSelect =
-  document.getElementById("runSelect");
-
-const domainSelect =
-  document.getElementById("domainSelect");
-
-const slider =
-  document.getElementById("slider");
-
-const plot =
-  document.getElementById("plot");
-
-const tiles =
-  document.getElementById("tiles");
-
-const fhrLabel =
-  document.getElementById("fhrLabel");
-
-const playBtn =
-  document.getElementById("playBtn");
-
-const viewerTitle =
-  document.getElementById("viewerTitle");
+const modelSelect = document.getElementById("modelSelect");
+const memberSelect = document.getElementById("memberSelect");
+const memberBlock = document.getElementById("memberBlock");
+const productSelect = document.getElementById("productSelect");
+const runSelect = document.getElementById("runSelect");
+const domainSelect = document.getElementById("domainSelect");
+const slider = document.getElementById("slider");
+const plot = document.getElementById("plot");
+const tiles = document.getElementById("tiles");
+const fhrLabel = document.getElementById("fhrLabel");
+const playBtn = document.getElementById("playBtn");
+const viewerTitle = document.getElementById("viewerTitle");
 
 modelSelect.value = selectedModel;
 memberSelect.value = selectedMember;
 
 function updateMemberVisibility() {
-
-  if (selectedModel === "refs") {
-    memberBlock.style.display = "inline-flex";
-  }
-
-  else {
-    memberBlock.style.display = "none";
-  }
+  memberBlock.style.display =
+    selectedModel === "refs" ? "inline-flex" : "none";
 }
 
 function addProductOption(value, label) {
-
-  const opt =
-    document.createElement("option");
-
+  const opt = document.createElement("option");
   opt.value = value;
   opt.textContent = label;
-
   productSelect.appendChild(opt);
 }
 
 function updateProductOptions() {
-
   productSelect.innerHTML = "";
 
   if (selectedModel === "hrrr") {
-
-    addProductOption(
-      "refl_uh",
-      "Reflectivity/UH"
-    );
-
-    addProductOption(
-      "hail_swath",
-      "Hail Swath"
-    );
-
-    addProductOption(
-      "max_uh_02",
-      "Max 0-2 km UH"
-    );
+    addProductOption("refl_uh", "Reflectivity/UH");
+    addProductOption("hail_swath", "Hail Swath");
+    addProductOption("max_uh_02", "Max 0-2 km UH");
   }
 
   else if (selectedModel === "rrfs") {
-
-    addProductOption(
-      "refl_uh",
-      "Reflectivity/UH"
-    );
-
-    addProductOption(
-      "hail_swath",
-      "Hail Swath"
-    );
+    addProductOption("refl_uh", "Reflectivity/UH");
+    addProductOption("hail_swath", "Hail Swath");
   }
 
   else if (selectedModel === "refs") {
+    addProductOption("refl_uh", "Reflectivity/UH");
+    addProductOption("hail_swath", "Hail Swath");
+  }
 
-    addProductOption(
-      "refl_uh",
-      "Reflectivity/UH"
-    );
+  const values = Array.from(productSelect.options).map(o => o.value);
+
+  if (!values.includes(selectedProduct)) {
+    selectedProduct = values[0] || "refl_uh";
   }
 
   productSelect.value = selectedProduct;
 }
 
 function updateTitle() {
-
-  let modelLabel =
-    selectedModel.toUpperCase();
+  let modelLabel = selectedModel.toUpperCase();
 
   if (selectedModel === "refs") {
-    modelLabel =
-      `REFS ${selectedMember.toUpperCase()}`;
+    modelLabel = "REFS " + selectedMember.toUpperCase();
   }
 
-  let productLabel =
-    productSelect.options[
-      productSelect.selectedIndex
-    ]?.text || "";
+  const productLabel =
+    productSelect.options[productSelect.selectedIndex]?.text || "";
 
-  viewerTitle.textContent =
-    `${modelLabel} ${productLabel}`;
+  viewerTitle.textContent = `${modelLabel} ${productLabel}`;
 }
 
 function getProductPath() {
-
   if (selectedModel === "refs") {
-
-    return (
-      `/runs/cams/refs/` +
-      `${selectedMember}/` +
-      `${selectedProduct}`
-    );
+    return `/runs/cams/refs/${selectedMember}/${selectedProduct}`;
   }
 
-  return (
-    `/runs/cams/${selectedModel}/` +
-    `${selectedProduct}`
-  );
+  return `/runs/cams/${selectedModel}/${selectedProduct}`;
 }
 
 function getFileName(fhr) {
-
-  const f =
-    String(fhr).padStart(3, "0");
+  const f = String(fhr).padStart(3, "0");
 
   if (selectedModel === "refs") {
+    if (selectedProduct === "hail_swath") {
+      return `refs_${selectedMember}_hail_swath_f${f}.png`;
+    }
 
-    return (
-      `refs_${selectedMember}` +
-      `_lbf_f${f}.png`
-    );
+    return `refs_${selectedMember}_lbf_f${f}.png`;
   }
 
   if (selectedProduct === "hail_swath") {
-
-    return (
-      `${selectedModel}` +
-      `_hail_swath_f${f}.png`
-    );
+    return `${selectedModel}_hail_swath_f${f}.png`;
   }
 
   if (selectedProduct === "max_uh_02") {
-
-    return (
-      `${selectedModel}` +
-      `_max_uh_02_f${f}.png`
-    );
+    return `${selectedModel}_max_uh_02_f${f}.png`;
   }
 
-  return (
-    `${selectedModel}` +
-    `_lbf_f${f}.png`
-  );
+  return `${selectedModel}_lbf_f${f}.png`;
 }
 
 function imgSrc(fhr) {
-
   if (!selectedRun) return "";
 
   return (
@@ -474,56 +345,79 @@ function imgSrc(fhr) {
   );
 }
 
+function runId(run) {
+  if (typeof run === "string") return run;
+  return run.id;
+}
+
+function runLabel(run) {
+  if (typeof run === "string") return run.replace("_", " ");
+  return run.label || run.id;
+}
+
+function updateMaxFhrForRun() {
+  const runObj =
+    runs.find(r => runId(r) === selectedRun);
+
+  if (
+    runObj &&
+    typeof runObj !== "string" &&
+    runObj.max_fhr !== undefined
+  ) {
+    maxFhr = Number(runObj.max_fhr);
+  } else {
+    const hourText = selectedRun.split("_")[1] || "";
+    const hour = Number(hourText.replace("z", ""));
+
+    maxFhr =
+      [0, 6, 12, 18].includes(hour)
+      ? 48
+      : 18;
+  }
+
+  slider.max = maxFhr;
+}
+
 async function loadRunsJson() {
-
-  let runsPath;
-
-  if (selectedModel === "refs") {
-
-    runsPath =
-      `${BASE_URL}/runs/cams/refs/` +
-      `${selectedMember}/` +
-      `${selectedProduct}/runs.json`;
-  }
-
-  else {
-
-    runsPath =
-      `${BASE_URL}/runs/cams/` +
-      `${selectedModel}/` +
-      `${selectedProduct}/runs.json`;
-  }
+  const runsPath =
+    BASE_URL +
+    getProductPath() +
+    "/runs.json?t=" +
+    Date.now();
 
   try {
+    const response = await fetch(runsPath);
+    const data = await response.json();
 
-    const response =
-      await fetch(runsPath);
-
-    runs =
-      await response.json();
+    runs = data.runs || [];
 
     if (runs.length > 0) {
-      selectedRun = runs[0];
-    }
-  }
+      const oldRun = selectedRun;
+      const runIds = runs.map(r => runId(r));
 
-  catch(err) {
-    console.error(err);
+      if (runIds.includes(oldRun)) {
+        selectedRun = oldRun;
+      } else {
+        selectedRun = runId(runs[0]);
+      }
+    } else {
+      selectedRun = "";
+    }
+
+  } catch(err) {
+    console.error("Could not load runs.json:", runsPath, err);
+    runs = [];
+    selectedRun = "";
   }
 }
 
 function populateRunDropdown() {
-
   runSelect.innerHTML = "";
 
   runs.forEach(run => {
-
-    const opt =
-      document.createElement("option");
-
-    opt.value = run;
-    opt.textContent = run;
-
+    const opt = document.createElement("option");
+    opt.value = runId(run);
+    opt.textContent = runLabel(run);
     runSelect.appendChild(opt);
   });
 
@@ -531,120 +425,87 @@ function populateRunDropdown() {
 }
 
 async function refreshHourAvailability() {
-
   tiles.innerHTML = "";
-
   availableFrames = [];
 
-  maxFhr =
-    selectedProduct === "hail_swath"
-    ? 48
-    : 18;
-
-  slider.max = maxFhr;
+  updateMaxFhrForRun();
 
   for (let f = 0; f <= maxFhr; f++) {
+    const button = document.createElement("button");
 
-    const button =
-      document.createElement("button");
-
-    button.className =
-      "frame missing";
-
-    button.textContent =
-      String(f).padStart(3, "0");
-
+    button.className = "frame missing";
+    button.textContent = String(f).padStart(3, "0");
     button.disabled = true;
 
     try {
-
       const response =
-        await fetch(imgSrc(f), {
-          method: "HEAD"
-        });
+        await fetch(imgSrc(f), { method: "HEAD" });
 
       if (response.ok) {
-
         availableFrames.push(f);
-
         button.disabled = false;
-
-        button.className =
-          "frame available";
+        button.className = "frame available";
 
         button.onclick = () => {
           setFrame(f);
         };
       }
-    }
-
-    catch(err) {}
+    } catch(err) {}
 
     tiles.appendChild(button);
   }
 }
 
 function firstAvailableFrame() {
-
-  if (availableFrames.length === 0) {
-    return 0;
-  }
-
+  if (availableFrames.length === 0) return 0;
   return availableFrames[0];
 }
 
 function setFrame(fhr) {
+  if (!selectedRun) return;
 
-  current = fhr;
-
+  current = Number(fhr);
   slider.value = current;
+  fhrLabel.textContent = String(current).padStart(3, "0");
+  plot.src = imgSrc(current);
 
-  fhrLabel.textContent =
-    String(current).padStart(3, "0");
+  document.querySelectorAll(".frame").forEach((btn, idx) => {
+    btn.classList.remove("active");
 
-  plot.src =
-    imgSrc(current);
-
-  document.querySelectorAll(".frame")
-    .forEach((btn, idx) => {
-
-      btn.classList.remove("active");
-
-      if (idx === current) {
-        btn.classList.add("active");
-      }
-    });
+    if (idx === current) {
+      btn.classList.add("active");
+    }
+  });
 }
 
 slider.addEventListener("input", () => {
-  setFrame(parseInt(slider.value));
+  const f = parseInt(slider.value);
+
+  if (availableFrames.includes(f)) {
+    setFrame(f);
+  } else {
+    slider.value = current;
+  }
 });
 
 function togglePlay() {
-
   playing = !playing;
 
   playBtn.textContent =
-    playing
-    ? "⏸ Pause"
-    : "▶ Play";
+    playing ? "⏸ Pause" : "▶ Play";
 
   if (!playing) {
-
     clearInterval(timer);
     return;
   }
 
   timer = setInterval(() => {
+    if (availableFrames.length === 0) return;
 
-    let idx =
-      availableFrames.indexOf(current);
-
+    let idx = availableFrames.indexOf(current);
     idx++;
 
-    if (idx >= availableFrames.length) {
-      idx = 0;
-    }
+    if (idx >= availableFrames.length) idx = 0;
 
     setFrame(availableFrames[idx]);
 
@@ -652,95 +513,80 @@ function togglePlay() {
 }
 
 async function refreshViewer() {
-
   await loadRunsJson();
-
   populateRunDropdown();
-
   await refreshHourAvailability();
 }
 
 async function latestRun() {
-
+  selectedRun = "";
   await refreshViewer();
-
   setFrame(firstAvailableFrame());
 }
 
 async function changeModel() {
+  selectedModel = modelSelect.value;
 
-  selectedModel =
-    modelSelect.value;
+  if (selectedModel !== "refs") {
+    selectedMember = "m01";
+  } else {
+    selectedMember = memberSelect.value;
+  }
+
+  selectedProduct = "";
+  selectedRun = "";
+  plot.src = "";
 
   updateMemberVisibility();
-
   updateProductOptions();
-
   updateTitle();
 
   await refreshViewer();
-
   setFrame(firstAvailableFrame());
 }
 
 async function changeMember() {
-
-  selectedMember =
-    memberSelect.value;
+  selectedMember = memberSelect.value;
+  selectedRun = "";
+  plot.src = "";
 
   updateTitle();
 
   await refreshViewer();
-
   setFrame(firstAvailableFrame());
 }
 
 async function changeProduct() {
-
-  selectedProduct =
-    productSelect.value;
+  selectedProduct = productSelect.value;
+  selectedRun = "";
+  plot.src = "";
 
   updateTitle();
 
   await refreshViewer();
-
   setFrame(firstAvailableFrame());
 }
 
 async function changeRun() {
-
-  selectedRun =
-    runSelect.value;
+  selectedRun = runSelect.value;
 
   await refreshHourAvailability();
-
   setFrame(firstAvailableFrame());
 }
 
 async function changeDomain() {
-
-  selectedDomain =
-    domainSelect.value;
+  selectedDomain = domainSelect.value;
 
   await refreshHourAvailability();
-
   setFrame(firstAvailableFrame());
 }
 
 async function init() {
-
   updateMemberVisibility();
-
   updateProductOptions();
-
   updateTitle();
 
-  await loadRunsJson();
-
-  populateRunDropdown();
-
-  await refreshHourAvailability();
-
+  await refreshViewer();
   setFrame(firstAvailableFrame());
 
   setInterval(async () => {
@@ -749,7 +595,6 @@ async function init() {
 }
 
 init();
-
 </script>
 
 </body>
