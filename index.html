@@ -2,6 +2,7 @@
 <html>
 <head>
   <title>NWS LBF Model Viewer</title>
+
   <style>
     body {
       margin: 0;
@@ -33,24 +34,63 @@
       color: #777;
     }
 
-    .content {
+    .hero {
+      padding: 50px 30px 20px 30px;
+      text-align: center;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: 42px;
+    }
+
+    .hero p {
+      margin-top: 14px;
+      color: #bbb;
+      font-size: 18px;
+    }
+
+    .section-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 24px;
       padding: 30px;
     }
 
     .section-card {
-      display: inline-block;
       background: #1b1b1b;
       border: 1px solid #333;
-      padding: 22px;
-      margin: 12px;
-      border-radius: 6px;
-      min-width: 240px;
-      color: white;
+      border-radius: 8px;
+      width: 320px;
+      padding: 28px;
+      transition: 0.18s;
       text-decoration: none;
+      color: white;
     }
 
     .section-card:hover {
       border-color: #6ea8ff;
+      transform: translateY(-2px);
+    }
+
+    .section-card h2 {
+      margin-top: 0;
+      margin-bottom: 12px;
+      font-size: 28px;
+    }
+
+    .section-card p {
+      color: #bbb;
+      line-height: 1.5;
+      margin-bottom: 0;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 30px;
+      color: #666;
+      font-size: 14px;
     }
   </style>
 </head>
@@ -60,23 +100,63 @@
 <div class="navbar">
   <a href="index.html">HOME</a>
   <span>/</span>
-  <a href="cams.html?model=hrrr">CAMS</a>
+
+  <a href="cams.html?model=hrrr">
+    CAMs
+  </a>
+
   <span>/</span>
-  <a href="mesoensembles.html">MESO-ENSEMBLES</a>
+
+  <a href="mesoensprob.html">
+    MESO-ENS PROB
+  </a>
 </div>
 
-<div class="content">
+<div class="hero">
+
   <h1>NWS LBF Model Viewer</h1>
 
-  <a class="section-card" href="cams.html?model=hrrr">
+  <p>
+    Experimental convection-allowing model guidance,
+    meso-ensemble probabilities, verification, and
+    severe weather analysis tools.
+  </p>
+
+</div>
+
+<div class="section-container">
+
+  <a class="section-card"
+     href="cams.html?model=hrrr">
+
     <h2>CAMs</h2>
-    <p>HRRR, RRFS, and future convection-allowing model guidance.</p>
+
+    <p>
+      HRRR, RRFS, and REFS member guidance including
+      reflectivity, updraft helicity, hail swaths,
+      simulated IR, and additional severe-weather products.
+    </p>
+
   </a>
 
-  <a class="section-card" href="mesoensembles.html">
-    <h2>Meso-Ensembles</h2>
-    <p>REFS, HREF, and severe-weather probability guidance.</p>
+
+  <a class="section-card"
+     href="mesoensprob.html">
+
+    <h2>MESO-ENS PROB</h2>
+
+    <p>
+      Meso-ensemble probability guidance including
+      REFS and HREF neighborhood probabilities,
+      severe-weather probabilities, and ensemble diagnostics.
+    </p>
+
   </a>
+
+</div>
+
+<div class="footer">
+  NWS North Platte, Nebraska
 </div>
 
 </body>
