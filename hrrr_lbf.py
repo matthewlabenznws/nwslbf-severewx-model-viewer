@@ -370,26 +370,49 @@ def get_lat_lon(da):
 def hrrr_field(cycle_date, cycle_hour, fhr, product, search, label):
     init_dt = datetime.strptime(f"{cycle_date}{cycle_hour:02d}", "%Y%m%d%H")
 
-    H = Herbie(
-        init_dt,
-        model="hrrr",
-        product=product,
-        fxx=fhr,
-        priority=["aws", "google", "azure", "nomads"],
-        verbose=False
+    priority_sets = [
+        ["aws"],
+        ["google"],
+        ["azure"],
+        ["nomads"],
+    ]
+
+    last_err = None
+
+    for priority in priority_sets:
+        try:
+            print(f"Trying {label} | F{fhr:03d} | {search} | source={priority[0]}")
+
+            H = Herbie(
+                init_dt,
+                model="hrrr",
+                product=product,
+                fxx=fhr,
+                priority=priority,
+                verbose=False
+            )
+
+            ds = H.xarray(search, remove_grib=False)
+
+            if isinstance(ds, list):
+                ds = ds[0]
+
+            if len(ds.data_vars) == 0:
+                raise RuntimeError(
+                    f"No variables found for {label} with search {search}"
+                )
+
+            var = list(ds.data_vars)[0]
+
+            return ds[var].squeeze()
+
+        except Exception as e:
+            print(f"Failed {label} from {priority[0]}: {e}")
+            last_err = e
+
+    raise RuntimeError(
+        f"Could not open {label} F{fhr:03d} after all sources. Last error: {last_err}"
     )
-
-    ds = H.xarray(search, remove_grib=False)
-
-    if isinstance(ds, list):
-        ds = ds[0]
-
-    if len(ds.data_vars) == 0:
-        raise RuntimeError(f"Could not open {label} with Herbie search: {search}")
-
-    var = list(ds.data_vars)[0]
-
-    return ds[var].squeeze()
 
 
 def subset_2d(lat, lon, *fields):
@@ -1013,10 +1036,12 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
 # ============================================================
 
 for fhr in fhrs:
-    fields = load_hrrr_fields_once(fhr)
+    try:
+        fields = load_hrrr_fields_once(fhr)
 
-    for domain_key, cfg in DOMAINS.items():
-        plot_domain_from_fields(fields, domain_key, cfg, fhr)
+        for domain_key, cfg in DOMAINS.items():
+            plot_domain_from_fields(fields, domain_key, cfg, fhr)
 
-
-print("Done. Uploaded HRRR reflectivity test to R2.")
+    except Exception as e:
+        print(f"Skipping F{fhr:03d} due to error: {e}")
+        continue
