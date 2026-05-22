@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+
+  <title>MESO-ENS PROB Viewer</title>
+
+  <style>
+
+    body {
+      margin: 0;
+      background: #111;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+
+    .navbar {
+      background: #1a1a1a;
+      padding: 12px 18px;
+      border-bottom: 1px solid #333;
+      text-align: left;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .navbar a {
+      color: white;
+      text-decoration: none;
+      margin: 0 6px;
+    }
+
+    .navbar a:hover {
+      color: #6ea8ff;
+    }
+
+    .navbar span {
+      color: #777;
+    }
+
+    .topbar {
+      background: #1b1b1b;
+      padding: 10px 14px;
+      border-bottom: 1px solid #444;
+
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    select, button {
+      background: #2c2c2c;
+      color: white;
+      border: 1px solid #666;
+      padding: 6px 10px;
+      border-radius: 3px;
+      font-weight: bold;
+    }
+
+    .topbar label {
+      font-weight: bold;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: auto auto 1fr auto;
+      gap: 10px;
+      padding: 8px 12px;
+      background: #181818;
+    }
+
+    input[type="range"] {
+      width: 100%;
+    }
+
+    .tiles {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 3px;
+      padding: 8px;
+      background: #0f0f0f;
+    }
+
+    .frame {
+      min-width: 44px;
+      padding: 5px 8px;
+    }
+
+    .available {
+      background: #2b7cff;
+      color: white;
+      border-color: #9ec0ff;
+      cursor: pointer;
+    }
+
+    .missing {
+      background: #111;
+      color: #aaa;
+      border-color: #555;
+    }
+
+    .frame:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .active {
+      outline: 2px solid white;
+    }
+
+    #plot {
+      max-width: 98vw;
+      max-height: calc(100vh - 300px);
+      border: 1px solid #333;
+      background: #000;
+    }
+
+  </style>
+</head>
+
+<body>
+
+<div class="navbar">
+  <a href="index.html">HOME</a>
+  <span>/</span>
+  <a href="cams.html">CAMs</a>
+  <span>/</span>
+  <a href="mesoensprob.html">MESO-ENS PROB</a>
+</div>
+
+<div class="topbar">
+
+  <b id="viewerTitle">
+    HREF Severe Storm Probability
+  </b>
+
+  <label>Model:</label>
+
+  <select id="modelSelect">
+    <option value="href">HREF</option>
+  </select>
+
+  <label>Product:</label>
+
+  <select id="productSelect">
+    <option value="severe_prob">
+      Severe Storm Probability
+    </option>
+  </select>
+
+  <label>Run:</label>
+
+  <select id="runSelect" onchange="changeRun()"></select>
+
+  <label>Domain:</label>
+
+  <select id="domainSelect" onchange="changeDomain()">
+    <option value="regional">Regional</option>
+    <option value="lbf">LBF</option>
+    <option value="central_plains">Central Plains</option>
+    <option value="spc_severe">SPC Severe</option>
+  </select>
+
+</div>
+
+<div class="controls">
+
+  <button onclick="togglePlay()" id="playBtn">
+    ▶ Play
+  </button>
+
+  <button onclick="latestRun()">
+    Latest
+  </button>
+
+  <input id="slider" type="range" min="0" max="48" value="0">
+
+  <div id="fhrLabel">00</div>
+
+</div>
+
+<div class="tiles" id="tiles"></div>
+
+<br>
+
+<img id="plot" src="">
+
+<script>
+
+const BASE_URL =
+  "https://data.nwslbfmtlsvrwx.com";
+
+const MODEL_KEY = "href";
+const PRODUCT_KEY = "severe_prob";
+
+let selectedRun = "";
+let selectedDomain = "regional";
+
+let current = 0;
+let maxFhr = 48;
+
+let availableFrames = [];
+let playing = false;
+let timer = null;
+let runs = [];
+
+const runSelect =
+  document.getElementById("runSelect");
+
+const domainSelect =
+  document.getElementById("domainSelect");
+
+const slider =
+  document.getElementById("slider");
+
+const plot =
+  document.getElementById("plot");
+
+const tiles =
+  document.getElementById("tiles");
+
+const fhrLabel =
+  document.getElementById("fhrLabel");
+
+const playBtn =
+  document.getElementById("playBtn");
+
+function imgSrc(fhr) {
+
+  const f =
+    String(fhr).padStart(2, "0");
+
+  return (
+    `${BASE_URL}` +
+    `/runs/mesoensprob/${MODEL_KEY}/${PRODUCT_KEY}` +
+    `/${selectedRun}` +
+    `/${selectedDomain}` +
+    `/href_severe_prob_f${f}.png` +
+    `?t=${Date.now()}`
+  );
+}
+
+async function loadRunsJson() {
+
+  const path =
+    `${BASE_URL}` +
+    `/runs/mesoensprob/${MODEL_KEY}/${PRODUCT_KEY}` +
+    `/runs.json?t=${Date.now()}`;
+
+  try {
+
+    const response =
+      await fetch(path);
+
+    const data =
+      await response.json();
+
+    runs = data.runs || [];
+
+    if (runs.length > 0) {
+
+      const first =
+        runs[0];
+
+      selectedRun =
+        typeof first === "string"
+        ? first
+        : first.id;
+    }
+
+  }
+
+  catch(err) {
+    console.error(err);
+  }
+}
+
+function populateRunDropdown() {
+
+  runSelect.innerHTML = "";
+
+  runs.forEach(run => {
+
+    const opt =
+      document.createElement("option");
+
+    if (typeof run === "string") {
+
+      opt.value = run;
+      opt.textContent = run;
+    }
+
+    else {
+
+      opt.value = run.id;
+      opt.textContent =
+        run.label || run.id;
+    }
+
+    runSelect.appendChild(opt);
+  });
+
+  runSelect.value = selectedRun;
+}
+
+async function refreshHourAvailability() {
+
+  tiles.innerHTML = "";
+  availableFrames = [];
+
+  for (let f = 0; f <= maxFhr; f++) {
+
+    const button =
+      document.createElement("button");
+
+    button.className =
+      "frame missing";
+
+    button.textContent =
+      String(f).padStart(2, "0");
+
+    button.disabled = true;
+
+    try {
+
+      const response =
+        await fetch(
+          imgSrc(f),
+          { method: "HEAD" }
+        );
+
+      if (response.ok) {
+
+        availableFrames.push(f);
+
+        button.disabled = false;
+
+        button.className =
+          "frame available";
+
+        button.onclick = () => {
+          setFrame(f);
+        };
+      }
+    }
+
+    catch(err) {}
+
+    tiles.appendChild(button);
+  }
+}
+
+function firstAvailableFrame() {
+
+  if (availableFrames.length === 0) {
+    return 0;
+  }
+
+  return availableFrames[0];
+}
+
+function setFrame(fhr) {
+
+  current = fhr;
+
+  slider.value = current;
+
+  fhrLabel.textContent =
+    String(current).padStart(2, "0");
+
+  plot.src =
+    imgSrc(current);
+
+  document.querySelectorAll(".frame")
+    .forEach((btn, idx) => {
+
+      btn.classList.remove("active");
+
+      if (idx === current) {
+        btn.classList.add("active");
+      }
+    });
+}
+
+slider.addEventListener("input", () => {
+
+  const f =
+    parseInt(slider.value);
+
+  if (availableFrames.includes(f)) {
+    setFrame(f);
+  }
+});
+
+function togglePlay() {
+
+  playing = !playing;
+
+  playBtn.textContent =
+    playing
+    ? "⏸ Pause"
+    : "▶ Play";
+
+  if (!playing) {
+
+    clearInterval(timer);
+    return;
+  }
+
+  timer = setInterval(() => {
+
+    let idx =
+      availableFrames.indexOf(current);
+
+    idx++;
+
+    if (idx >= availableFrames.length) {
+      idx = 0;
+    }
+
+    setFrame(availableFrames[idx]);
+
+  }, 700);
+}
+
+async function refreshViewer() {
+
+  await loadRunsJson();
+
+  populateRunDropdown();
+
+  await refreshHourAvailability();
+}
+
+async function latestRun() {
+
+  await refreshViewer();
+
+  setFrame(firstAvailableFrame());
+}
+
+async function changeRun() {
+
+  selectedRun =
+    runSelect.value;
+
+  await refreshHourAvailability();
+
+  setFrame(firstAvailableFrame());
+}
+
+async function changeDomain() {
+
+  selectedDomain =
+    domainSelect.value;
+
+  await refreshHourAvailability();
+
+  setFrame(firstAvailableFrame());
+}
+
+async function init() {
+
+  await refreshViewer();
+
+  setFrame(firstAvailableFrame());
+
+  setInterval(async () => {
+    await refreshViewer();
+  }, 30000);
+}
+
+init();
+
+</script>
+
+</body>
+</html>
