@@ -31,22 +31,19 @@
       font-size: 16px;
     }
 
-    .navbar a,
-    .subbar a {
+    .navbar a, .subbar a {
       color: white;
       text-decoration: none;
       margin: 0 8px;
       transition: 0.2s ease;
     }
 
-    .navbar a:hover,
-    .subbar a:hover {
+    .navbar a:hover, .subbar a:hover {
       color: #6ea8ff;
       text-shadow: 0 0 10px rgba(110,168,255,0.35);
     }
 
-    .navbar span,
-    .subbar span {
+    .navbar span, .subbar span {
       color: #777;
     }
 
@@ -61,8 +58,7 @@
       gap: 14px;
     }
 
-    select,
-    button {
+    select, button {
       background: #2c2c2c;
       color: white;
       border: 1px solid #555;
@@ -72,8 +68,7 @@
       transition: 0.2s ease;
     }
 
-    select:hover,
-    button:hover {
+    select:hover, button:hover {
       border-color: #6ea8ff;
       box-shadow: 0 0 10px rgba(110,168,255,0.2);
     }
@@ -180,18 +175,7 @@
       line-height: 1.6;
     }
 
-    .profile-pic {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 2px solid #444;
-      margin-bottom: 12px;
-      box-shadow: 0 0 14px rgba(255,255,255,0.08);
-    }
-
     @media (max-width: 700px) {
-
       .navbar {
         font-size: 18px;
       }
@@ -286,25 +270,394 @@
 </div>
 
 <div class="footer">
-
-  <img
-    src="assets/profile.jpg"
-    alt="Matthew Labenz"
-    class="profile-pic"
-  >
-
-  <br>
-
   Developed by Matthew Labenz<br>
   NWS North Platte, Nebraska
-
 </div>
 
 <script>
+const BASE_URL = "https://data.nwslbfmtlsvrwx.com";
 
-/* KEEP ALL OF YOUR EXISTING JAVASCRIPT BELOW THIS LINE */
-/* YOUR ORIGINAL JS FROM cams.html GOES HERE UNCHANGED */
+const params = new URLSearchParams(window.location.search);
 
+let selectedModel = params.get("model") || "hrrr";
+let selectedMember = params.get("member") || "m01";
+let selectedProduct = params.get("product") || "refl_uh";
+
+let selectedRun = "";
+let selectedDomain = "regional";
+let current = 0;
+let maxFhr = 18;
+let availableFrames = [];
+let playing = false;
+let timer = null;
+let runs = [];
+
+const modelSelect = document.getElementById("modelSelect");
+const memberSelect = document.getElementById("memberSelect");
+const memberBlock = document.getElementById("memberBlock");
+const productSelect = document.getElementById("productSelect");
+const runSelect = document.getElementById("runSelect");
+const domainSelect = document.getElementById("domainSelect");
+const slider = document.getElementById("slider");
+const plot = document.getElementById("plot");
+const tiles = document.getElementById("tiles");
+const fhrLabel = document.getElementById("fhrLabel");
+const playBtn = document.getElementById("playBtn");
+const viewerTitle = document.getElementById("viewerTitle");
+
+modelSelect.value = selectedModel;
+memberSelect.value = selectedMember;
+
+function updateMemberVisibility() {
+  memberBlock.style.display =
+    selectedModel === "refs" ? "inline-flex" : "none";
+}
+
+function addProductOption(value, label) {
+  const opt = document.createElement("option");
+  opt.value = value;
+  opt.textContent = label;
+  productSelect.appendChild(opt);
+}
+
+function updateProductOptions() {
+  productSelect.innerHTML = "";
+
+  if (selectedModel === "hrrr") {
+    addProductOption("refl_uh", "Reflectivity/UH");
+    addProductOption("hail_swath", "Hail Swath");
+    addProductOption("max_uh_02", "Max 0-2 km UH");
+  }
+
+  else if (selectedModel === "rrfs") {
+    addProductOption("refl_uh", "Reflectivity/UH");
+    addProductOption("hail_swath", "Hail Swath");
+  }
+
+  else if (selectedModel === "refs") {
+    addProductOption("refl_uh", "Reflectivity/UH");
+    addProductOption("hail_swath", "Hail Swath");
+  }
+
+  const values = Array.from(productSelect.options).map(o => o.value);
+
+  if (!values.includes(selectedProduct)) {
+    selectedProduct = values[0] || "refl_uh";
+  }
+
+  productSelect.value = selectedProduct;
+}
+
+function updateTitle() {
+  let modelLabel = selectedModel.toUpperCase();
+
+  if (selectedModel === "refs") {
+    modelLabel = "REFS " + selectedMember.toUpperCase();
+  }
+
+  const productLabel =
+    productSelect.options[productSelect.selectedIndex]?.text || "";
+
+  viewerTitle.textContent = `${modelLabel} ${productLabel}`;
+}
+
+function getProductPath() {
+  if (selectedModel === "refs") {
+    return `/runs/cams/refs/${selectedMember}/${selectedProduct}`;
+  }
+
+  return `/runs/cams/${selectedModel}/${selectedProduct}`;
+}
+
+function getFileName(fhr) {
+  const f = String(fhr).padStart(3, "0");
+
+  if (selectedModel === "refs") {
+    if (selectedProduct === "hail_swath") {
+      return `refs_${selectedMember}_hail_swath_f${f}.png`;
+    }
+
+    return `refs_${selectedMember}_lbf_f${f}.png`;
+  }
+
+  if (selectedProduct === "hail_swath") {
+    return `${selectedModel}_hail_swath_f${f}.png`;
+  }
+
+  if (selectedProduct === "max_uh_02") {
+    return `${selectedModel}_max_uh_02_f${f}.png`;
+  }
+
+  return `${selectedModel}_lbf_f${f}.png`;
+}
+
+function imgSrc(fhr) {
+  if (!selectedRun) return "";
+
+  return (
+    BASE_URL +
+    getProductPath() +
+    "/" +
+    selectedRun +
+    "/" +
+    selectedDomain +
+    "/" +
+    getFileName(fhr) +
+    "?t=" +
+    Date.now()
+  );
+}
+
+function runId(run) {
+  if (typeof run === "string") return run;
+  return run.id;
+}
+
+function runLabel(run) {
+  if (typeof run === "string") return run.replace("_", " ");
+  return run.label || run.id;
+}
+
+function updateMaxFhrForRun() {
+  const runObj =
+    runs.find(r => runId(r) === selectedRun);
+
+  if (
+    runObj &&
+    typeof runObj !== "string" &&
+    runObj.max_fhr !== undefined
+  ) {
+    maxFhr = Number(runObj.max_fhr);
+  } else {
+    const hourText = selectedRun.split("_")[1] || "";
+    const hour = Number(hourText.replace("z", ""));
+
+    maxFhr =
+      [0, 6, 12, 18].includes(hour)
+      ? 48
+      : 18;
+  }
+
+  slider.max = maxFhr;
+}
+
+async function loadRunsJson() {
+  const runsPath =
+    BASE_URL +
+    getProductPath() +
+    "/runs.json?t=" +
+    Date.now();
+
+  try {
+    const response = await fetch(runsPath);
+    const data = await response.json();
+
+    runs = data.runs || [];
+
+    if (runs.length > 0) {
+      const oldRun = selectedRun;
+      const runIds = runs.map(r => runId(r));
+
+      if (runIds.includes(oldRun)) {
+        selectedRun = oldRun;
+      } else {
+        selectedRun = runId(runs[0]);
+      }
+    } else {
+      selectedRun = "";
+    }
+
+  } catch(err) {
+    console.error("Could not load runs.json:", runsPath, err);
+    runs = [];
+    selectedRun = "";
+  }
+}
+
+function populateRunDropdown() {
+  runSelect.innerHTML = "";
+
+  runs.forEach(run => {
+    const opt = document.createElement("option");
+    opt.value = runId(run);
+    opt.textContent = runLabel(run);
+    runSelect.appendChild(opt);
+  });
+
+  runSelect.value = selectedRun;
+}
+
+async function refreshHourAvailability() {
+  tiles.innerHTML = "";
+  availableFrames = [];
+
+  updateMaxFhrForRun();
+
+  for (let f = 0; f <= maxFhr; f++) {
+    const button = document.createElement("button");
+
+    button.className = "frame missing";
+    button.textContent = String(f).padStart(3, "0");
+    button.disabled = true;
+
+    try {
+      const response =
+        await fetch(imgSrc(f), { method: "HEAD" });
+
+      if (response.ok) {
+        availableFrames.push(f);
+        button.disabled = false;
+        button.className = "frame available";
+
+        button.onclick = () => {
+          setFrame(f);
+        };
+      }
+    } catch(err) {}
+
+    tiles.appendChild(button);
+  }
+}
+
+function firstAvailableFrame() {
+  if (availableFrames.length === 0) return 0;
+  return availableFrames[0];
+}
+
+function setFrame(fhr) {
+  if (!selectedRun) return;
+
+  current = Number(fhr);
+  slider.value = current;
+  fhrLabel.textContent = String(current).padStart(3, "0");
+  plot.src = imgSrc(current);
+
+  document.querySelectorAll(".frame").forEach((btn, idx) => {
+    btn.classList.remove("active");
+
+    if (idx === current) {
+      btn.classList.add("active");
+    }
+  });
+}
+
+slider.addEventListener("input", () => {
+  const f = parseInt(slider.value);
+
+  if (availableFrames.includes(f)) {
+    setFrame(f);
+  } else {
+    slider.value = current;
+  }
+});
+
+function togglePlay() {
+  playing = !playing;
+
+  playBtn.textContent =
+    playing ? "⏸ Pause" : "▶ Play";
+
+  if (!playing) {
+    clearInterval(timer);
+    return;
+  }
+
+  timer = setInterval(() => {
+    if (availableFrames.length === 0) return;
+
+    let idx = availableFrames.indexOf(current);
+    idx++;
+
+    if (idx >= availableFrames.length) idx = 0;
+
+    setFrame(availableFrames[idx]);
+
+  }, 700);
+}
+
+async function refreshViewer() {
+  await loadRunsJson();
+  populateRunDropdown();
+  await refreshHourAvailability();
+}
+
+async function latestRun() {
+  selectedRun = "";
+  await refreshViewer();
+  setFrame(firstAvailableFrame());
+}
+
+async function changeModel() {
+  selectedModel = modelSelect.value;
+
+  if (selectedModel !== "refs") {
+    selectedMember = "m01";
+  } else {
+    selectedMember = memberSelect.value;
+  }
+
+  selectedProduct = "";
+  selectedRun = "";
+  plot.src = "";
+
+  updateMemberVisibility();
+  updateProductOptions();
+  updateTitle();
+
+  await refreshViewer();
+  setFrame(firstAvailableFrame());
+}
+
+async function changeMember() {
+  selectedMember = memberSelect.value;
+  selectedRun = "";
+  plot.src = "";
+
+  updateTitle();
+
+  await refreshViewer();
+  setFrame(firstAvailableFrame());
+}
+
+async function changeProduct() {
+  selectedProduct = productSelect.value;
+  selectedRun = "";
+  plot.src = "";
+
+  updateTitle();
+
+  await refreshViewer();
+  setFrame(firstAvailableFrame());
+}
+
+async function changeRun() {
+  selectedRun = runSelect.value;
+
+  await refreshHourAvailability();
+  setFrame(firstAvailableFrame());
+}
+
+async function changeDomain() {
+  selectedDomain = domainSelect.value;
+
+  await refreshHourAvailability();
+  setFrame(firstAvailableFrame());
+}
+
+async function init() {
+  updateMemberVisibility();
+  updateProductOptions();
+  updateTitle();
+
+  await refreshViewer();
+  setFrame(firstAvailableFrame());
+
+  setInterval(async () => {
+    await refreshViewer();
+  }, 30000);
+}
+
+init();
 </script>
 
 </body>
