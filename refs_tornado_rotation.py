@@ -1,9 +1,9 @@
 # ============================================================
-# REFS M01 | R2 Meso-Ensemble Product
+# REFS | R2 Meso-Ensemble Probability Product
 # Tornado / Rotating Storm Support
-# Fill: 0-3 km Helicity >= 200 m2/s2
-# Contours: 2-5 km UH >= 75 and 150 m2/s2
-# Uploads runs.json and PNGs to runs/mesoens/refs/m01/tornado_rotation/
+# Fill: 0-3 km helicity > 200 probability
+# Contours: 2-5 km UH > 75 probability
+# Uploads runs.json and PNGs to runs/mesoensprob/refs/tornado_rotation/
 # ============================================================
 
 import os
@@ -29,7 +29,6 @@ from shapely.prepared import prep
 from scipy.ndimage import gaussian_filter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from datetime import datetime, timedelta, timezone
-from matplotlib.colors import BoundaryNorm
 from botocore.config import Config
 
 
@@ -52,19 +51,17 @@ if os.path.exists(zip_path):
 
 DATA_DIR = os.path.join(BASE_DIR, "refs_tornado_rotation_subsets")
 
-SECTION_KEY = "mesoens"
+SECTION_KEY = "mesoensprob"
 MODEL_KEY = "refs"
-MEMBER_KEY = "m01"
 PRODUCT_KEY = "tornado_rotation"
 
-R2_PRODUCT_PATH = f"runs/{SECTION_KEY}/{MODEL_KEY}/{MEMBER_KEY}/{PRODUCT_KEY}"
+R2_PRODUCT_PATH = f"runs/{SECTION_KEY}/{MODEL_KEY}/{PRODUCT_KEY}"
 
 OUTDIR_BASE = os.path.join(
     "site",
     "runs",
     SECTION_KEY,
     MODEL_KEY,
-    MEMBER_KEY,
     PRODUCT_KEY
 )
 
@@ -204,12 +201,7 @@ def add_spc_severe_domain():
         main_poly = highest.loc[highest["_area"].idxmax()]
         highest_label = main_poly["risk"]
 
-        main_gdf = gpd.GeoDataFrame(
-            [main_poly],
-            geometry="geometry",
-            crs="EPSG:4326"
-        )
-
+        main_gdf = gpd.GeoDataFrame([main_poly], geometry="geometry", crs="EPSG:4326")
         centroid_proj = main_gdf.to_crs(epsg=5070).geometry.centroid
 
         centroid_ll = gpd.GeoSeries(
@@ -248,20 +240,19 @@ add_spc_severe_domain()
 # SETTINGS
 # ============================================================
 
-REFS_MEMBER = "m001"
-MODEL_LABEL = "REFS M01"
+MODEL_LABEL = "REFS"
 
 VALID_REFS_CYCLES = [0, 6, 12, 18]
 
 START_FHR = 1
 MAX_FHR = 60
 
-CYCLE_DELAY_MINUTES = 75
+CYCLE_DELAY_MINUTES = 90
 
-HLCY_LEVELS = [200, 250, 300, 400, 500, 600, 750, 1000]
-HLCY_TICKS = [200, 300, 400, 500, 600, 750, 1000]
+PROB_LEVELS = [5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90]
+PROB_TICKS = [5, 10, 20, 30, 40, 50, 60, 70, 80, 90]
 
-UH_CONTOURS = [75, 150, 250]
+UH_CONTOURS = [10, 20, 30, 40, 50, 60, 70]
 
 
 # ============================================================
@@ -300,6 +291,15 @@ def ensure_2d_field(da, label):
             f"{label} is not 2D after squeeze. "
             f"Shape={arr.shape}, dims={getattr(da, 'dims', None)}"
         )
+
+    return arr
+
+
+def normalize_probability(arr):
+    arr = np.asarray(arr, dtype=float)
+
+    if np.nanmax(arr) <= 1.01:
+        arr = arr * 100.0
 
     return arr
 
@@ -372,21 +372,18 @@ def add_counties_clipped_to_cwa(ax, counties_shp_path, cwa_geom, lw=1.0, color="
 
 
 # ============================================================
-# REFS URL / IDX BYTE-RANGE SUBSETTING
+# REFS PROB URL / IDX BYTE-RANGE SUBSETTING
 # ============================================================
 
-def refs_grib_url(init_dt, fhr, product="2dfld"):
+def refs_grib_url(init_dt, fhr):
     ymd = init_dt.strftime("%Y%m%d")
     hh = init_dt.strftime("%H")
 
-    if product == "2dfld":
-        fname = f"rrfs.t{hh}z.{REFS_MEMBER}.2dfld.3km.f{fhr:03d}.conus.grib2"
-    else:
-        raise ValueError("product must be '2dfld'")
+    fname = f"refs.t{hh}z.prob.f{fhr:03d}.conus.grib2"
 
     return (
         f"https://noaa-rrfs-pds.s3.amazonaws.com/"
-        f"rrfs_a/rrfsens.{ymd}/{hh}/{REFS_MEMBER}/{fname}"
+        f"rrfs_public/refs.{ymd}/{hh}/enspost/{fname}"
     )
 
 
@@ -409,7 +406,7 @@ def find_latest_available_refs_cycle(max_back_hours=96):
 
         dt = dt.replace(minute=0, second=0, microsecond=0, tzinfo=None)
 
-        test_url = refs_grib_url(dt, 1, product="2dfld") + ".idx"
+        test_url = refs_grib_url(dt, 1) + ".idx"
 
         if url_exists(test_url):
             print(f"Latest {MODEL_LABEL} cycle found: {dt:%Y%m%d} {dt:%HZ}")
@@ -523,8 +520,8 @@ def open_subset_grib(path, label):
     return da
 
 
-def refs_idx_field(init_dt, fhr, term_sets, label, product="2dfld"):
-    grib_url = refs_grib_url(init_dt, fhr, product=product)
+def refs_idx_field(init_dt, fhr, term_sets, label):
+    grib_url = refs_grib_url(init_dt, fhr)
     idx_url = grib_url + ".idx"
 
     lines = read_idx(idx_url)
@@ -539,7 +536,7 @@ def refs_idx_field(init_dt, fhr, term_sets, label, product="2dfld"):
             safe_label = re.sub(r"[^A-Za-z0-9]+", "_", label).strip("_")
 
             outname = (
-                f"refs_{REFS_MEMBER}_{product}_{init_dt:%Y%m%d_%H}z_f{fhr:03d}_"
+                f"refs_prob_{init_dt:%Y%m%d_%H}z_f{fhr:03d}_"
                 f"{safe_label}_{match['msg_num']}.grib2"
             )
 
@@ -605,10 +602,7 @@ def upload_runs_json(init_dt, cycle_str, max_fhr):
             Key=f"{R2_PRODUCT_PATH}/runs.json"
         )
 
-        old_data = json.loads(
-            obj["Body"].read().decode("utf-8")
-        )
-
+        old_data = json.loads(obj["Body"].read().decode("utf-8"))
         old_runs = old_data.get("runs", [])
 
     except Exception:
@@ -625,7 +619,6 @@ def upload_runs_json(init_dt, cycle_str, max_fhr):
     for r in old_runs:
         if isinstance(r, str):
             rid = r
-
             combined.append({
                 "id": rid,
                 "label": rid.replace("_", " "),
@@ -648,7 +641,7 @@ def upload_runs_json(init_dt, cycle_str, max_fhr):
         content_type="application/json"
     )
 
-    print("Uploaded runs.json with last 4 REFS M01 runs.")
+    print("Uploaded runs.json with last 4 REFS runs.")
 
 
 # ============================================================
@@ -686,37 +679,39 @@ def load_refs_fields_once(fhr):
         init_dt,
         fhr,
         [
-            ["HLCY", "3000-0 m"],
-            ["HLCY", "3000-0"],
-            ["HLCY"],
+            ["HLCY", "3000-0 m", "prob >200"],
+            ["HLCY", "3000-0", "prob >200"],
+            ["HLCY", "prob >200"],
         ],
-        "0-3km helicity",
-        product="2dfld"
+        "0-3km helicity >200 probability"
     )
 
     lat, lon = get_lat_lon(hlcy_da)
 
-    hlcy = ensure_2d_field(hlcy_da, "0-3km helicity")
+    hlcy_prob = normalize_probability(
+        ensure_2d_field(hlcy_da, "0-3km helicity >200 probability")
+    )
 
-    uh25_da = refs_idx_field(
+    uh75_da = refs_idx_field(
         init_dt,
         fhr,
         [
-            ["MXUPHL", "5000-2000"],
-            ["MXUPHL", "5000 - 2000"],
-            ["MXUPHL"],
+            ["MXUPHL", "5000-2000 m", "prob >75"],
+            ["MXUPHL", "5000-2000", "prob >75"],
+            ["MXUPHL", "prob >75"],
         ],
-        "2-5km UH",
-        product="2dfld"
+        "2-5km UH >75 probability"
     )
 
-    uh25 = ensure_2d_field(uh25_da, "2-5km UH")
+    uh75_prob = normalize_probability(
+        ensure_2d_field(uh75_da, "2-5km UH >75 probability")
+    )
 
     return {
         "lat": lat,
         "lon": lon,
-        "hlcy": hlcy,
-        "uh25": uh25,
+        "hlcy_prob": hlcy_prob,
+        "uh75_prob": uh75_prob,
     }
 
 
@@ -737,23 +732,24 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
     try:
         lat = fields["lat"]
         lon = fields["lon"]
-        hlcy = fields["hlcy"]
-        uh25 = fields["uh25"]
+        hlcy_prob = fields["hlcy_prob"]
+        uh75_prob = fields["uh75_prob"]
 
         lat_sub, lon_sub, [
             hlcy_sub,
-            uh25_sub,
+            uh75_sub,
         ] = subset_2d(
             lat,
             lon,
-            hlcy,
-            uh25
+            hlcy_prob,
+            uh75_prob
         )
 
         hlcy_plot = gaussian_filter(np.nan_to_num(hlcy_sub, nan=0.0), sigma=0.7)
-        uh25_plot = gaussian_filter(np.nan_to_num(uh25_sub, nan=0.0), sigma=0.5)
+        uh75_plot = gaussian_filter(np.nan_to_num(uh75_sub, nan=0.0), sigma=0.7)
 
-        hlcy_plot = np.where(hlcy_plot >= 200, hlcy_plot, np.nan)
+        hlcy_plot = np.where(hlcy_plot >= 5, hlcy_plot, np.nan)
+        uh75_plot = np.where(uh75_plot >= 5, uh75_plot, np.nan)
 
         plt.close("all")
         plt.rcParams["contour.negative_linestyle"] = "solid"
@@ -764,29 +760,25 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
         ax.set_extent(cfg["extent"], crs=ccrs.PlateCarree())
         ax.add_feature(cfeature.LAND, facecolor="white", zorder=0)
 
-        cmap = plt.cm.BuPu
-        norm = BoundaryNorm(HLCY_LEVELS, cmap.N, clip=False)
-
         pm = ax.contourf(
             lon_sub,
             lat_sub,
             hlcy_plot,
-            levels=HLCY_LEVELS,
-            cmap=cmap,
-            norm=norm,
+            levels=PROB_LEVELS,
+            cmap=plt.cm.BuPu,
             extend="max",
             transform=ccrs.PlateCarree(),
             zorder=5
         )
 
-        if np.isfinite(uh25_plot).any() and np.nanmax(uh25_plot) >= 75:
+        if np.isfinite(uh75_plot).any() and np.nanmax(uh75_plot) >= 10:
             cs = ax.contour(
                 lon_sub,
                 lat_sub,
-                uh25_plot,
+                uh75_plot,
                 levels=UH_CONTOURS,
-                colors=["black", "#4a004a", "#ff00ff"],
-                linewidths=[1.2, 1.6, 2.0],
+                colors="black",
+                linewidths=[0.6, 0.7, 0.9, 1.2, 1.4, 1.6, 1.8],
                 transform=ccrs.PlateCarree(),
                 zorder=8
             )
@@ -828,8 +820,8 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
         init_title = f"Init: {init_dt:%a %Y-%m-%d %HZ} {MODEL_LABEL}"
 
         main_title = (
-            f"{MODEL_LABEL} | Fill: 0-3 km Helicity >= 200 m²/s² | "
-            "Contours: 2-5 km UH >= 75/150/250 m²/s²"
+            f"{MODEL_LABEL} | Fill: 0-3 km Helicity > 200 m²/s² Probability | "
+            "Black Contours: 2-5 km UH > 75 m²/s² Probability"
         )
 
         ax.text(
@@ -875,12 +867,12 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
             pm,
             cax=cax,
             orientation="horizontal",
-            ticks=HLCY_TICKS,
+            ticks=PROB_TICKS,
             drawedges=True
         )
 
         cbar.set_label(
-            "0-3 km Helicity (m²/s²)",
+            "Probability of 0-3 km Helicity > 200 m²/s² (%)",
             fontsize=10,
             weight="bold"
         )
@@ -927,7 +919,7 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
             path_effects=[pe.withStroke(linewidth=2.5, foreground="white")]
         )
 
-        outname = os.path.join(domain_outdir, f"refs_m01_tornado_rotation_f{fhr:03d}.png")
+        outname = os.path.join(domain_outdir, f"refs_tornado_rotation_f{fhr:03d}.png")
 
         plt.savefig(outname, dpi=140, bbox_inches="tight")
         plt.close(fig)
@@ -963,4 +955,4 @@ for fhr in fhrs:
     except Exception as e:
         print(f"FAILED F{fhr:03d}: {e}")
 
-print("Done. Uploaded REFS M01 tornado/rotating storm support to R2:", R2_PRODUCT_PATH)
+print("Done. Uploaded REFS tornado/rotating storm support probability to R2:", R2_PRODUCT_PATH)
