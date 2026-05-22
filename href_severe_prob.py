@@ -104,7 +104,7 @@ DOMAINS = {
     "lbf": {
         "label": "LBF",
         "extent": [-103.8, -97.0, 40.0, 43.4],
-        "title_size": 14,
+        "title_size": 12,
         "subtitle_size": 11,
     },
 
@@ -227,7 +227,7 @@ def add_spc_severe_domain():
         DOMAINS["spc_severe"] = {
             "label": f"SPC {highest_label} Risk",
             "extent": extent,
-            "title_size": 13,
+            "title_size": 11,
             "subtitle_size": 11,
         }
 
