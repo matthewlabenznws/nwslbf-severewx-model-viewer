@@ -216,11 +216,30 @@ function addProductOption(value, label) {
 function updateProductOptions() {
   productSelect.innerHTML = "";
 
-  addProductOption("severe_prob", "UH > 75 & REFC > 40 Probability");
-  addProductOption("storm_coverage", "Storm Coverage Probability");
-  addProductOption("organized_severe", "Organized Severe Probability");
-  addProductOption("tornado_rotation", "Tornado/Rotation Probability");
-  addProductOption("wind_prob", "Severe Wind Probability");
+  addProductOption(
+    "severe_prob",
+    "UH > 75 & REFC > 40 Probability"
+  );
+
+  addProductOption(
+    "storm_coverage",
+    "Lightning > 0.2 & REFC > 40 Probability"
+  );
+
+  addProductOption(
+    "organized_severe",
+    "CAPE > 1500 & 0–6 km Shear > 40 kt Probability"
+  );
+
+  addProductOption(
+    "tornado_rotation",
+    "0–3 km Helicity > 200 & 2–5 km UH > 75 Probability"
+  );
+
+  addProductOption(
+    "wind_prob",
+    "10m Wind Gust > 58 mph Probability"
+  );
 
   productSelect.value = selectedProduct;
 }
@@ -452,11 +471,7 @@ async function changeModel() {
   selectedRun = "";
   plot.src = "";
 
-  if (selectedModel === "href") {
-    maxFhr = 48;
-  } else {
-    maxFhr = 60;
-  }
+  maxFhr = selectedModel === "href" ? 48 : 60;
 
   updateMemberVisibility();
   updateProductOptions();
