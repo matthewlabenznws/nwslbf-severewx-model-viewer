@@ -2,11 +2,9 @@
 <html>
 <head>
   <meta charset="utf-8">
-
   <title>MESO-ENS PROB Viewer</title>
 
   <style>
-
     body {
       margin: 0;
       background: #111;
@@ -42,7 +40,6 @@
       background: #1b1b1b;
       padding: 10px 14px;
       border-bottom: 1px solid #444;
-
       display: flex;
       flex-wrap: wrap;
       align-items: center;
@@ -61,6 +58,10 @@
 
     .topbar label {
       font-weight: bold;
+    }
+
+    #memberBlock {
+      display: none;
     }
 
     .controls {
@@ -117,7 +118,6 @@
       border: 1px solid #333;
       background: #000;
     }
-
   </style>
 </head>
 
@@ -133,30 +133,28 @@
 
 <div class="topbar">
 
-  <b id="viewerTitle">
-    HREF UH > 75 & REFC > 40 Probability
-  </b>
+  <b id="viewerTitle">HREF UH > 75 & REFC > 40 Probability</b>
 
   <label>Model:</label>
-
-  <select id="modelSelect">
+  <select id="modelSelect" onchange="changeModel()">
     <option value="href">HREF</option>
+    <option value="refs">REFS</option>
   </select>
+
+  <span id="memberBlock">
+    <label>Member:</label>
+    <select id="memberSelect" onchange="changeMember()">
+      <option value="m01">M01</option>
+    </select>
+  </span>
 
   <label>Product:</label>
-
-  <select id="productSelect">
-    <option value="severe_prob">
-      UH > 75 & REFC > 40 Probability
-    </option>
-  </select>
+  <select id="productSelect" onchange="changeProduct()"></select>
 
   <label>Run:</label>
-
   <select id="runSelect" onchange="changeRun()"></select>
 
   <label>Domain:</label>
-
   <select id="domainSelect" onchange="changeDomain()">
     <option value="regional">Regional</option>
     <option value="lbf">LBF</option>
@@ -167,19 +165,10 @@
 </div>
 
 <div class="controls">
-
-  <button onclick="togglePlay()" id="playBtn">
-    ▶ Play
-  </button>
-
-  <button onclick="latestRun()">
-    Latest
-  </button>
-
+  <button onclick="togglePlay()" id="playBtn">▶ Play</button>
+  <button onclick="latestRun()">Latest</button>
   <input id="slider" type="range" min="0" max="48" value="0">
-
   <div id="fhrLabel">00</div>
-
 </div>
 
 <div class="tiles" id="tiles"></div>
@@ -189,237 +178,257 @@
 <img id="plot" src="">
 
 <script>
+const BASE_URL = "https://data.nwslbfmtlsvrwx.com";
 
-const BASE_URL =
-  "https://data.nwslbfmtlsvrwx.com";
-
-const MODEL_KEY = "href";
-const PRODUCT_KEY = "severe_prob";
-
+let selectedModel = "href";
+let selectedMember = "m01";
+let selectedProduct = "severe_prob";
 let selectedRun = "";
 let selectedDomain = "regional";
 
 let current = 0;
 let maxFhr = 48;
-
 let availableFrames = [];
 let playing = false;
 let timer = null;
 let runs = [];
 
-const runSelect =
-  document.getElementById("runSelect");
+const modelSelect = document.getElementById("modelSelect");
+const memberSelect = document.getElementById("memberSelect");
+const memberBlock = document.getElementById("memberBlock");
+const productSelect = document.getElementById("productSelect");
+const runSelect = document.getElementById("runSelect");
+const domainSelect = document.getElementById("domainSelect");
+const slider = document.getElementById("slider");
+const plot = document.getElementById("plot");
+const tiles = document.getElementById("tiles");
+const fhrLabel = document.getElementById("fhrLabel");
+const playBtn = document.getElementById("playBtn");
+const viewerTitle = document.getElementById("viewerTitle");
 
-const domainSelect =
-  document.getElementById("domainSelect");
+function addProductOption(value, label) {
+  const opt = document.createElement("option");
+  opt.value = value;
+  opt.textContent = label;
+  productSelect.appendChild(opt);
+}
 
-const slider =
-  document.getElementById("slider");
+function updateProductOptions() {
+  productSelect.innerHTML = "";
 
-const plot =
-  document.getElementById("plot");
+  addProductOption("severe_prob", "UH > 75 & REFC > 40 Probability");
+  addProductOption("storm_coverage", "Storm Coverage Probability");
+  addProductOption("organized_severe", "Organized Severe Probability");
+  addProductOption("tornado_rotation", "Tornado/Rotation Probability");
+  addProductOption("wind_prob", "Severe Wind Probability");
 
-const tiles =
-  document.getElementById("tiles");
+  productSelect.value = selectedProduct;
+}
 
-const fhrLabel =
-  document.getElementById("fhrLabel");
+function updateMemberVisibility() {
+  memberBlock.style.display =
+    selectedModel === "refs" ? "inline-flex" : "none";
+}
 
-const playBtn =
-  document.getElementById("playBtn");
+function productLabel() {
+  return productSelect.options[productSelect.selectedIndex]?.text || "";
+}
+
+function updateTitle() {
+  let modelLabel = selectedModel.toUpperCase();
+
+  if (selectedModel === "refs") {
+    modelLabel = "REFS " + selectedMember.toUpperCase();
+  }
+
+  viewerTitle.textContent = modelLabel + " " + productLabel();
+}
+
+function getProductPath() {
+  if (selectedModel === "href") {
+    return `/runs/mesoensprob/href/${selectedProduct}`;
+  }
+
+  return `/runs/mesoens/refs/${selectedMember}/${selectedProduct}`;
+}
+
+function getFileName(fhr) {
+  if (selectedModel === "href") {
+    const f = String(fhr).padStart(2, "0");
+    return `href_${selectedProduct}_f${f}.png`;
+  }
+
+  const f = String(fhr).padStart(3, "0");
+  return `refs_${selectedMember}_${selectedProduct}_f${f}.png`;
+}
 
 function imgSrc(fhr) {
-
-  const f =
-    String(fhr).padStart(2, "0");
+  if (!selectedRun) return "";
 
   return (
-    `${BASE_URL}` +
-    `/runs/mesoensprob/${MODEL_KEY}/${PRODUCT_KEY}` +
-    `/${selectedRun}` +
-    `/${selectedDomain}` +
-    `/href_severe_prob_f${f}.png` +
-    `?t=${Date.now()}`
+    BASE_URL +
+    getProductPath() +
+    "/" +
+    selectedRun +
+    "/" +
+    selectedDomain +
+    "/" +
+    getFileName(fhr) +
+    "?t=" +
+    Date.now()
   );
 }
 
-async function loadRunsJson() {
+function runId(run) {
+  if (typeof run === "string") return run;
+  return run.id;
+}
 
+function runLabel(run) {
+  if (typeof run === "string") return run.replace("_", " ");
+  return run.label || run.id;
+}
+
+async function loadRunsJson() {
   const path =
-    `${BASE_URL}` +
-    `/runs/mesoensprob/${MODEL_KEY}/${PRODUCT_KEY}` +
-    `/runs.json?t=${Date.now()}`;
+    BASE_URL +
+    getProductPath() +
+    "/runs.json?t=" +
+    Date.now();
 
   try {
-
-    const response =
-      await fetch(path);
-
-    const data =
-      await response.json();
+    const response = await fetch(path);
+    const data = await response.json();
 
     runs = data.runs || [];
 
     if (runs.length > 0) {
-
-      const first =
-        runs[0];
-
-      selectedRun =
-        typeof first === "string"
-        ? first
-        : first.id;
+      selectedRun = runId(runs[0]);
+    } else {
+      selectedRun = "";
     }
 
-  }
-
-  catch(err) {
-    console.error(err);
+  } catch(err) {
+    console.error("Could not load runs.json:", path, err);
+    runs = [];
+    selectedRun = "";
   }
 }
 
 function populateRunDropdown() {
-
   runSelect.innerHTML = "";
 
   runs.forEach(run => {
-
-    const opt =
-      document.createElement("option");
-
-    if (typeof run === "string") {
-
-      opt.value = run;
-      opt.textContent = run;
-    }
-
-    else {
-
-      opt.value = run.id;
-      opt.textContent =
-        run.label || run.id;
-    }
-
+    const opt = document.createElement("option");
+    opt.value = runId(run);
+    opt.textContent = runLabel(run);
     runSelect.appendChild(opt);
   });
 
   runSelect.value = selectedRun;
 }
 
-async function refreshHourAvailability() {
+function updateMaxFhrForRun() {
+  const runObj = runs.find(r => runId(r) === selectedRun);
 
+  if (
+    runObj &&
+    typeof runObj !== "string" &&
+    runObj.max_fhr !== undefined
+  ) {
+    maxFhr = Number(runObj.max_fhr);
+  } else {
+    maxFhr = selectedModel === "href" ? 48 : 60;
+  }
+
+  slider.max = maxFhr;
+}
+
+async function refreshHourAvailability() {
   tiles.innerHTML = "";
   availableFrames = [];
 
+  updateMaxFhrForRun();
+
   for (let f = 0; f <= maxFhr; f++) {
+    const button = document.createElement("button");
 
-    const button =
-      document.createElement("button");
-
-    button.className =
-      "frame missing";
-
+    button.className = "frame missing";
     button.textContent =
-      String(f).padStart(2, "0");
+      selectedModel === "href"
+      ? String(f).padStart(2, "0")
+      : String(f).padStart(3, "0");
 
     button.disabled = true;
 
     try {
-
       const response =
-        await fetch(
-          imgSrc(f),
-          { method: "HEAD" }
-        );
+        await fetch(imgSrc(f), { method: "HEAD" });
 
       if (response.ok) {
-
         availableFrames.push(f);
-
         button.disabled = false;
-
-        button.className =
-          "frame available";
-
-        button.onclick = () => {
-          setFrame(f);
-        };
+        button.className = "frame available";
+        button.onclick = () => setFrame(f);
       }
-    }
 
-    catch(err) {}
+    } catch(err) {}
 
     tiles.appendChild(button);
   }
 }
 
 function firstAvailableFrame() {
-
-  if (availableFrames.length === 0) {
-    return 0;
-  }
-
-  return availableFrames[0];
+  return availableFrames.length > 0 ? availableFrames[0] : 0;
 }
 
 function setFrame(fhr) {
+  if (!selectedRun) return;
 
   current = fhr;
-
   slider.value = current;
 
   fhrLabel.textContent =
-    String(current).padStart(2, "0");
+    selectedModel === "href"
+    ? String(current).padStart(2, "0")
+    : String(current).padStart(3, "0");
 
-  plot.src =
-    imgSrc(current);
+  plot.src = imgSrc(current);
 
-  document.querySelectorAll(".frame")
-    .forEach((btn, idx) => {
-
-      btn.classList.remove("active");
-
-      if (idx === current) {
-        btn.classList.add("active");
-      }
-    });
+  document.querySelectorAll(".frame").forEach((btn, idx) => {
+    btn.classList.remove("active");
+    if (idx === current) btn.classList.add("active");
+  });
 }
 
 slider.addEventListener("input", () => {
-
-  const f =
-    parseInt(slider.value);
+  const f = parseInt(slider.value);
 
   if (availableFrames.includes(f)) {
     setFrame(f);
+  } else {
+    slider.value = current;
   }
 });
 
 function togglePlay() {
-
   playing = !playing;
 
   playBtn.textContent =
-    playing
-    ? "⏸ Pause"
-    : "▶ Play";
+    playing ? "⏸ Pause" : "▶ Play";
 
   if (!playing) {
-
     clearInterval(timer);
     return;
   }
 
   timer = setInterval(() => {
+    if (availableFrames.length === 0) return;
 
-    let idx =
-      availableFrames.indexOf(current);
-
+    let idx = availableFrames.indexOf(current);
     idx++;
 
-    if (idx >= availableFrames.length) {
-      idx = 0;
-    }
+    if (idx >= availableFrames.length) idx = 0;
 
     setFrame(availableFrames[idx]);
 
@@ -427,45 +436,78 @@ function togglePlay() {
 }
 
 async function refreshViewer() {
-
   await loadRunsJson();
-
   populateRunDropdown();
-
   await refreshHourAvailability();
 }
 
 async function latestRun() {
+  selectedRun = "";
+  await refreshViewer();
+  setFrame(firstAvailableFrame());
+}
+
+async function changeModel() {
+  selectedModel = modelSelect.value;
+  selectedRun = "";
+  plot.src = "";
+
+  if (selectedModel === "href") {
+    maxFhr = 48;
+  } else {
+    maxFhr = 60;
+  }
+
+  updateMemberVisibility();
+  updateProductOptions();
+  updateTitle();
 
   await refreshViewer();
+  setFrame(firstAvailableFrame());
+}
 
+async function changeMember() {
+  selectedMember = memberSelect.value;
+  selectedRun = "";
+  plot.src = "";
+
+  updateTitle();
+
+  await refreshViewer();
+  setFrame(firstAvailableFrame());
+}
+
+async function changeProduct() {
+  selectedProduct = productSelect.value;
+  selectedRun = "";
+  plot.src = "";
+
+  updateTitle();
+
+  await refreshViewer();
   setFrame(firstAvailableFrame());
 }
 
 async function changeRun() {
-
-  selectedRun =
-    runSelect.value;
+  selectedRun = runSelect.value;
 
   await refreshHourAvailability();
-
   setFrame(firstAvailableFrame());
 }
 
 async function changeDomain() {
-
-  selectedDomain =
-    domainSelect.value;
+  selectedDomain = domainSelect.value;
 
   await refreshHourAvailability();
-
   setFrame(firstAvailableFrame());
 }
 
 async function init() {
+  updateMemberVisibility();
+  updateProductOptions();
+  updateTitle();
 
   await refreshViewer();
-
   setFrame(firstAvailableFrame());
 
   setInterval(async () => {
@@ -474,7 +516,6 @@ async function init() {
 }
 
 init();
-
 </script>
 
 </body>
