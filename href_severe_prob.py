@@ -827,8 +827,8 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
         valid_title = f"F{fhr:02d} Valid: {valid_dt:%a %Y-%m-%d %HZ}"
         init_title = f"Init: {init_dt:%a %Y-%m-%d %HZ} {MODEL_LABEL}"
 
-        main_title = f"{MODEL_LABEL} | Severe Storm Probability"
-        sub_title = "Fill: 2-5 km UH > 75 m²/s² Probability | Black Contours: Composite Reflectivity > 40 dBZ Probability"
+        main_title = f"{MODEL_LABEL} | Fill: 2-5 km UH > 75 m²/s² Probability | Black Contours: Composite Reflectivity > 40 dBZ Probability"
+        
 
         ax.text(
             0.0, 1.042,
@@ -860,17 +860,6 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
             fontweight="bold"
         )
 
-        ax.text(
-            0.0, 0.975,
-            sub_title,
-            transform=ax.transAxes,
-            ha="left",
-            va="bottom",
-            fontsize=9,
-            fontweight="bold",
-            color="black",
-            path_effects=[pe.withStroke(linewidth=2.5, foreground="white")]
-        )
 
         divider = make_axes_locatable(ax)
 
