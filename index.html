@@ -1,29 +1,31 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>NWS LBF Model Viewer</title>
+  <meta charset="utf-8">
+  <title>NWS LBF Severe Weather Model Viewer</title>
 
   <style>
     body {
       margin: 0;
-      background: #111;
+      background: #0f0f0f;
       color: white;
       font-family: Arial, sans-serif;
+      text-align: center;
     }
 
     .navbar {
       background: #1a1a1a;
-      padding: 12px 18px;
+      padding: 14px 24px;
       border-bottom: 1px solid #333;
       text-align: left;
-      font-size: 20px;
+      font-size: 22px;
       font-weight: bold;
     }
 
     .navbar a {
       color: white;
       text-decoration: none;
-      margin: 0 6px;
+      margin: 0 8px;
     }
 
     .navbar a:hover {
@@ -35,62 +37,114 @@
     }
 
     .hero {
-      padding: 50px 30px 20px 30px;
-      text-align: center;
+      padding: 42px 20px 30px 20px;
     }
 
-    .hero h1 {
-      margin: 0;
-      font-size: 42px;
-    }
-
-    .hero p {
-      margin-top: 14px;
-      color: #bbb;
-      font-size: 18px;
-    }
-
-    .section-container {
+    .logos {
       display: flex;
-      flex-wrap: wrap;
       justify-content: center;
-      gap: 24px;
-      padding: 30px;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 18px;
     }
 
-    .section-card {
-      background: #1b1b1b;
+    .logos img {
+      height: 72px;
+      max-width: 180px;
+      object-fit: contain;
+    }
+
+    h1 {
+      font-size: 52px;
+      margin: 10px 0 8px 0;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 28px;
+      max-width: 1040px;
+      margin: 34px auto 50px auto;
+      padding: 0 24px;
+    }
+
+    .card {
+      background: #1a1a1a;
       border: 1px solid #333;
-      border-radius: 8px;
-      width: 320px;
-      padding: 28px;
-      transition: 0.18s;
+      border-radius: 10px;
+      text-align: left;
+      overflow: hidden;
       text-decoration: none;
       color: white;
+      transition: 0.25s ease;
     }
 
-    .section-card:hover {
+    .card:hover {
+      transform: translateY(-5px);
       border-color: #6ea8ff;
-      transform: translateY(-2px);
+      box-shadow: 0 0 24px rgba(110, 168, 255, 0.25);
     }
 
-    .section-card h2 {
-      margin-top: 0;
-      margin-bottom: 12px;
-      font-size: 28px;
+    .preview {
+      width: 100%;
+      height: 210px;
+      background: #050505;
+      border-bottom: 1px solid #333;
+      object-fit: cover;
+      display: block;
     }
 
-    .section-card p {
-      color: #bbb;
-      line-height: 1.5;
-      margin-bottom: 0;
+    .card-content {
+      padding: 24px 28px 28px 28px;
+    }
+
+    .card h2 {
+      font-size: 32px;
+      margin: 0 0 18px 0;
+      font-weight: 800;
+    }
+
+    .card p {
+      color: #c8c8c8;
+      font-size: 18px;
+      line-height: 1.45;
+      margin: 0;
+    }
+
+    .status {
+      display: inline-block;
+      margin-bottom: 14px;
+      font-size: 13px;
+      font-weight: bold;
+      color: #8fd18f;
+      letter-spacing: 0.5px;
     }
 
     .footer {
-      text-align: center;
-      padding: 30px;
-      color: #666;
-      font-size: 14px;
+      color: #777;
+      font-size: 15px;
+      margin: 38px 0 34px 0;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 700px) {
+      h1 {
+        font-size: 36px;
+      }
+
+      .logos img {
+        height: 56px;
+      }
+
+      .navbar {
+        font-size: 18px;
+      }
+
+      .card h2 {
+        font-size: 26px;
+      }
     }
   </style>
 </head>
@@ -100,62 +154,63 @@
 <div class="navbar">
   <a href="index.html">HOME</a>
   <span>/</span>
-
-  <a href="cams.html?model=hrrr">
-    CAMs
-  </a>
-
+  <a href="cams.html">CAMs</a>
   <span>/</span>
-
-  <a href="mesoensprob.html">
-    MESO-ENS PROB
-  </a>
+  <a href="mesoensprob.html">MESO-ENS PROB</a>
 </div>
 
 <div class="hero">
 
-  <h1>NWS LBF Model Viewer</h1>
+  <div class="logos">
+    <img src="assets/NOAANWSLogos.png" alt="NOAA and NWS logos">
+  </div>
 
-  <p>
-    Experimental convection-allowing model guidance,
-    meso-ensemble probabilities, verification, and
-    severe weather analysis tools.
-  </p>
+  <h1>NWS LBF Severe Weather Model Viewer</h1>
 
 </div>
 
-<div class="section-container">
+<div class="cards">
 
-  <a class="section-card"
-     href="cams.html?model=hrrr">
+  <a class="card" href="cams.html">
+    <img
+      class="preview"
+      src="https://data.nwslbfmtlsvrwx.com/runs/cams/hrrr/refl_uh/20260520_23z/regional/hrrr_lbf_f000.png"
+      alt="CAMs preview"
+      onerror="this.style.display='none';"
+    >
 
-    <h2>CAMs</h2>
-
-    <p>
-      HRRR, RRFS, and REFS member guidance including
-      reflectivity, updraft helicity, hail swaths,
-      simulated IR, and additional severe-weather products.
-    </p>
-
+    <div class="card-content">
+      <div class="status">● CAM GUIDANCE</div>
+      <h2>CAMs</h2>
+      <p>
+        HRRR, RRFS, and REFS member guidance including reflectivity,
+        updraft helicity, hail swaths, and severe-weather products.
+      </p>
+    </div>
   </a>
 
+  <a class="card" href="mesoensprob.html">
+    <img
+      class="preview"
+      src="https://data.nwslbfmtlsvrwx.com/runs/mesoensprob/href/severe_prob/runs.json"
+      alt="Meso-ensemble preview"
+      onerror="this.style.display='none';"
+    >
 
-  <a class="section-card"
-     href="mesoensprob.html">
-
-    <h2>MESO-ENS PROB</h2>
-
-    <p>
-      Meso-ensemble probability guidance including
-      REFS and HREF neighborhood probabilities,
-      severe-weather probabilities, and ensemble diagnostics.
-    </p>
-
+    <div class="card-content">
+      <div class="status">● ENSEMBLE PROBABILITIES</div>
+      <h2>MESO-ENS PROB</h2>
+      <p>
+        HREF and REFS probability guidance for storm coverage,
+        rotating storms, organized severe potential, and severe wind.
+      </p>
+    </div>
   </a>
 
 </div>
 
 <div class="footer">
+  Developed by Matthew Labenz<br>
   NWS North Platte, Nebraska
 </div>
 
