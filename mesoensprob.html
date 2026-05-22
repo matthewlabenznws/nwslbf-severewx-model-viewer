@@ -7,7 +7,7 @@
   <style>
     body {
       margin: 0;
-      background: #111;
+      background: linear-gradient(to bottom, #111 0%, #080808 100%);
       color: white;
       font-family: Arial, sans-serif;
       text-align: center;
@@ -15,21 +15,23 @@
 
     .navbar {
       background: #1a1a1a;
-      padding: 12px 18px;
+      padding: 14px 24px;
       border-bottom: 1px solid #333;
       text-align: left;
-      font-size: 20px;
+      font-size: 22px;
       font-weight: bold;
     }
 
     .navbar a {
       color: white;
       text-decoration: none;
-      margin: 0 6px;
+      margin: 0 8px;
+      transition: 0.2s ease;
     }
 
     .navbar a:hover {
       color: #6ea8ff;
+      text-shadow: 0 0 10px rgba(110,168,255,0.35);
     }
 
     .navbar span {
@@ -38,22 +40,30 @@
 
     .topbar {
       background: #1b1b1b;
-      padding: 10px 14px;
-      border-bottom: 1px solid #444;
+      padding: 14px 18px;
+      border-bottom: 1px solid #333;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: center;
-      gap: 12px;
+      gap: 14px;
     }
 
-    select, button {
+    select,
+    button {
       background: #2c2c2c;
       color: white;
-      border: 1px solid #666;
-      padding: 6px 10px;
-      border-radius: 3px;
+      border: 1px solid #555;
+      padding: 7px 12px;
+      border-radius: 6px;
       font-weight: bold;
+      transition: 0.2s ease;
+    }
+
+    select:hover,
+    button:hover {
+      border-color: #6ea8ff;
+      box-shadow: 0 0 10px rgba(110,168,255,0.2);
     }
 
     .topbar label {
@@ -64,12 +74,19 @@
       display: none;
     }
 
+    #viewerTitle {
+      font-size: 22px;
+      font-weight: 800;
+      margin-right: 18px;
+    }
+
     .controls {
       display: grid;
       grid-template-columns: auto auto 1fr auto;
-      gap: 10px;
-      padding: 8px 12px;
+      gap: 12px;
+      padding: 12px 16px;
       background: #181818;
+      border-bottom: 1px solid #2c2c2c;
     }
 
     input[type="range"] {
@@ -80,14 +97,16 @@
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: 3px;
-      padding: 8px;
-      background: #0f0f0f;
+      gap: 4px;
+      padding: 10px;
+      background: #101010;
     }
 
     .frame {
       min-width: 44px;
-      padding: 5px 8px;
+      padding: 6px 9px;
+      border-radius: 5px;
+      transition: 0.2s ease;
     }
 
     .available {
@@ -95,6 +114,11 @@
       color: white;
       border-color: #9ec0ff;
       cursor: pointer;
+    }
+
+    .available:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 12px rgba(110,168,255,0.35);
     }
 
     .missing {
@@ -112,11 +136,54 @@
       outline: 2px solid white;
     }
 
+    .plot-wrap {
+      padding: 16px;
+    }
+
     #plot {
       max-width: 98vw;
       max-height: calc(100vh - 300px);
       border: 1px solid #333;
+      border-radius: 10px;
       background: #000;
+      box-shadow: 0 0 22px rgba(0,0,0,0.45);
+    }
+
+    .footer {
+      color: #777;
+      font-size: 15px;
+      margin: 28px 0 34px 0;
+      line-height: 1.6;
+    }
+
+    .profile-pic {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #444;
+      margin-bottom: 12px;
+      box-shadow: 0 0 14px rgba(255,255,255,0.08);
+    }
+
+    @media (max-width: 700px) {
+
+      .navbar {
+        font-size: 18px;
+      }
+
+      #viewerTitle {
+        width: 100%;
+        margin-bottom: 8px;
+      }
+
+      .controls {
+        grid-template-columns: 1fr;
+      }
+
+      #plot {
+        max-height: calc(100vh - 420px);
+      }
     }
   </style>
 </head>
@@ -173,364 +240,30 @@
 
 <div class="tiles" id="tiles"></div>
 
-<br>
+<div class="plot-wrap">
+  <img id="plot" src="">
+</div>
 
-<img id="plot" src="">
+<div class="footer">
+
+  <img
+    src="assets/profile.jpg"
+    alt="Matthew Labenz"
+    class="profile-pic"
+  >
+
+  <br>
+
+  Developed by Matthew Labenz<br>
+  NWS North Platte, Nebraska
+
+</div>
 
 <script>
-const BASE_URL = "https://data.nwslbfmtlsvrwx.com";
 
-let selectedModel = "href";
-let selectedMember = "m01";
-let selectedProduct = "severe_prob";
-let selectedRun = "";
-let selectedDomain = "regional";
+/* KEEP ALL OF YOUR EXISTING JAVASCRIPT BELOW THIS LINE */
+/* YOUR ORIGINAL JS FROM mesoensprob.html GOES HERE UNCHANGED */
 
-let current = 0;
-let maxFhr = 48;
-let availableFrames = [];
-let playing = false;
-let timer = null;
-let runs = [];
-
-const modelSelect = document.getElementById("modelSelect");
-const memberSelect = document.getElementById("memberSelect");
-const memberBlock = document.getElementById("memberBlock");
-const productSelect = document.getElementById("productSelect");
-const runSelect = document.getElementById("runSelect");
-const domainSelect = document.getElementById("domainSelect");
-const slider = document.getElementById("slider");
-const plot = document.getElementById("plot");
-const tiles = document.getElementById("tiles");
-const fhrLabel = document.getElementById("fhrLabel");
-const playBtn = document.getElementById("playBtn");
-const viewerTitle = document.getElementById("viewerTitle");
-
-function addProductOption(value, label) {
-  const opt = document.createElement("option");
-  opt.value = value;
-  opt.textContent = label;
-  productSelect.appendChild(opt);
-}
-
-function updateProductOptions() {
-  productSelect.innerHTML = "";
-
-  addProductOption(
-    "severe_prob",
-    "UH > 75 & REFC > 40 Probability"
-  );
-
-  addProductOption(
-    "storm_coverage",
-    "Lightning > 0.2 & REFC > 40 Probability"
-  );
-
-  addProductOption(
-    "organized_severe",
-    "CAPE > 1500 & 0–6 km Shear > 40 kt Probability"
-  );
-
-  addProductOption(
-    "tornado_rotation",
-    "0–3 km Helicity > 200 & 2–5 km UH > 75 Probability"
-  );
-
-  addProductOption(
-    "wind_prob",
-    "10m Wind Gust > 58 mph Probability"
-  );
-
-  productSelect.value = selectedProduct;
-}
-
-function updateMemberVisibility() {
-  memberBlock.style.display =
-    selectedModel === "refs" ? "inline-flex" : "none";
-}
-
-function productLabel() {
-  return productSelect.options[productSelect.selectedIndex]?.text || "";
-}
-
-function updateTitle() {
-  let modelLabel = selectedModel.toUpperCase();
-
-  if (selectedModel === "refs") {
-    modelLabel = "REFS " + selectedMember.toUpperCase();
-  }
-
-  viewerTitle.textContent = modelLabel + " " + productLabel();
-}
-
-function getProductPath() {
-  if (selectedModel === "href") {
-    return `/runs/mesoensprob/href/${selectedProduct}`;
-  }
-
-  return `/runs/mesoens/refs/${selectedMember}/${selectedProduct}`;
-}
-
-function getFileName(fhr) {
-  if (selectedModel === "href") {
-    const f = String(fhr).padStart(2, "0");
-    return `href_${selectedProduct}_f${f}.png`;
-  }
-
-  const f = String(fhr).padStart(3, "0");
-  return `refs_${selectedMember}_${selectedProduct}_f${f}.png`;
-}
-
-function imgSrc(fhr) {
-  if (!selectedRun) return "";
-
-  return (
-    BASE_URL +
-    getProductPath() +
-    "/" +
-    selectedRun +
-    "/" +
-    selectedDomain +
-    "/" +
-    getFileName(fhr) +
-    "?t=" +
-    Date.now()
-  );
-}
-
-function runId(run) {
-  if (typeof run === "string") return run;
-  return run.id;
-}
-
-function runLabel(run) {
-  if (typeof run === "string") return run.replace("_", " ");
-  return run.label || run.id;
-}
-
-async function loadRunsJson() {
-  const path =
-    BASE_URL +
-    getProductPath() +
-    "/runs.json?t=" +
-    Date.now();
-
-  try {
-    const response = await fetch(path);
-    const data = await response.json();
-
-    runs = data.runs || [];
-
-    if (runs.length > 0) {
-      selectedRun = runId(runs[0]);
-    } else {
-      selectedRun = "";
-    }
-
-  } catch(err) {
-    console.error("Could not load runs.json:", path, err);
-    runs = [];
-    selectedRun = "";
-  }
-}
-
-function populateRunDropdown() {
-  runSelect.innerHTML = "";
-
-  runs.forEach(run => {
-    const opt = document.createElement("option");
-    opt.value = runId(run);
-    opt.textContent = runLabel(run);
-    runSelect.appendChild(opt);
-  });
-
-  runSelect.value = selectedRun;
-}
-
-function updateMaxFhrForRun() {
-  const runObj = runs.find(r => runId(r) === selectedRun);
-
-  if (
-    runObj &&
-    typeof runObj !== "string" &&
-    runObj.max_fhr !== undefined
-  ) {
-    maxFhr = Number(runObj.max_fhr);
-  } else {
-    maxFhr = selectedModel === "href" ? 48 : 60;
-  }
-
-  slider.max = maxFhr;
-}
-
-async function refreshHourAvailability() {
-  tiles.innerHTML = "";
-  availableFrames = [];
-
-  updateMaxFhrForRun();
-
-  for (let f = 0; f <= maxFhr; f++) {
-    const button = document.createElement("button");
-
-    button.className = "frame missing";
-    button.textContent =
-      selectedModel === "href"
-      ? String(f).padStart(2, "0")
-      : String(f).padStart(3, "0");
-
-    button.disabled = true;
-
-    try {
-      const response =
-        await fetch(imgSrc(f), { method: "HEAD" });
-
-      if (response.ok) {
-        availableFrames.push(f);
-        button.disabled = false;
-        button.className = "frame available";
-        button.onclick = () => setFrame(f);
-      }
-
-    } catch(err) {}
-
-    tiles.appendChild(button);
-  }
-}
-
-function firstAvailableFrame() {
-  return availableFrames.length > 0 ? availableFrames[0] : 0;
-}
-
-function setFrame(fhr) {
-  if (!selectedRun) return;
-
-  current = fhr;
-  slider.value = current;
-
-  fhrLabel.textContent =
-    selectedModel === "href"
-    ? String(current).padStart(2, "0")
-    : String(current).padStart(3, "0");
-
-  plot.src = imgSrc(current);
-
-  document.querySelectorAll(".frame").forEach((btn, idx) => {
-    btn.classList.remove("active");
-    if (idx === current) btn.classList.add("active");
-  });
-}
-
-slider.addEventListener("input", () => {
-  const f = parseInt(slider.value);
-
-  if (availableFrames.includes(f)) {
-    setFrame(f);
-  } else {
-    slider.value = current;
-  }
-});
-
-function togglePlay() {
-  playing = !playing;
-
-  playBtn.textContent =
-    playing ? "⏸ Pause" : "▶ Play";
-
-  if (!playing) {
-    clearInterval(timer);
-    return;
-  }
-
-  timer = setInterval(() => {
-    if (availableFrames.length === 0) return;
-
-    let idx = availableFrames.indexOf(current);
-    idx++;
-
-    if (idx >= availableFrames.length) idx = 0;
-
-    setFrame(availableFrames[idx]);
-
-  }, 700);
-}
-
-async function refreshViewer() {
-  await loadRunsJson();
-  populateRunDropdown();
-  await refreshHourAvailability();
-}
-
-async function latestRun() {
-  selectedRun = "";
-  await refreshViewer();
-  setFrame(firstAvailableFrame());
-}
-
-async function changeModel() {
-  selectedModel = modelSelect.value;
-  selectedRun = "";
-  plot.src = "";
-
-  maxFhr = selectedModel === "href" ? 48 : 60;
-
-  updateMemberVisibility();
-  updateProductOptions();
-  updateTitle();
-
-  await refreshViewer();
-  setFrame(firstAvailableFrame());
-}
-
-async function changeMember() {
-  selectedMember = memberSelect.value;
-  selectedRun = "";
-  plot.src = "";
-
-  updateTitle();
-
-  await refreshViewer();
-  setFrame(firstAvailableFrame());
-}
-
-async function changeProduct() {
-  selectedProduct = productSelect.value;
-  selectedRun = "";
-  plot.src = "";
-
-  updateTitle();
-
-  await refreshViewer();
-  setFrame(firstAvailableFrame());
-}
-
-async function changeRun() {
-  selectedRun = runSelect.value;
-
-  await refreshHourAvailability();
-  setFrame(firstAvailableFrame());
-}
-
-async function changeDomain() {
-  selectedDomain = domainSelect.value;
-
-  await refreshHourAvailability();
-  setFrame(firstAvailableFrame());
-}
-
-async function init() {
-  updateMemberVisibility();
-  updateProductOptions();
-  updateTitle();
-
-  await refreshViewer();
-  setFrame(firstAvailableFrame());
-
-  setInterval(async () => {
-    await refreshViewer();
-  }, 30000);
-}
-
-init();
 </script>
 
 </body>
