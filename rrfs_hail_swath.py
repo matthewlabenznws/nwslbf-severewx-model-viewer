@@ -70,16 +70,13 @@ os.makedirs(OUTDIR_BASE, exist_ok=True)
 # R2 SETUP
 # ============================================================
 
-BUCKET = os.environ["R2_BUCKET"]
-ACCOUNT_ID = os.environ["R2_ACCOUNT_ID"]
+BUCKET = os.environ["AWS_BUCKET"]
 
 s3 = boto3.client(
     "s3",
-    endpoint_url=f"https://{ACCOUNT_ID}.r2.cloudflarestorage.com",
-    aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
-    aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
-    config=Config(signature_version="s3v4"),
-    region_name="auto",
+    aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
+    aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
+    region_name=os.environ["AWS_REGION"],
 )
 
 
