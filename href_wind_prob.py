@@ -376,7 +376,7 @@ def plot_domain(fields, domain_key, cfg, fhr):
 
     valid_dt = init_dt + timedelta(hours=fhr)
 
-    ax.text(0.0, 1.042, f"{MODEL_LABEL} | Fill: 10-m Wind > 25.72 m/s Probability | Black Contours: Composite Reflectivity > 40 dBZ Probability",
+    ax.text(0.0, 1.042, f"{MODEL_LABEL} | Fill: 10-m Wind > 58 mph Probability | Black Contours: Composite Reflectivity > 40 dBZ Probability",
             transform=ax.transAxes, ha="left", va="bottom", fontsize=cfg["title_size"], fontweight="bold")
     ax.text(0.0, 1.005, f"F{fhr:02d} Valid: {valid_dt:%a %Y-%m-%d %HZ}",
             transform=ax.transAxes, ha="left", va="bottom", fontsize=cfg["subtitle_size"], fontweight="bold")
@@ -386,7 +386,7 @@ def plot_domain(fields, domain_key, cfg, fhr):
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("bottom", size="3%", pad=0.25, axes_class=plt.Axes)
     cbar = plt.colorbar(pm, cax=cax, orientation="horizontal", ticks=PROB_TICKS, drawedges=True)
-    cbar.set_label("Probability of 10-m Wind > 25.72 m/s (~58 mph) (%)", fontsize=10, weight="bold")
+    cbar.set_label("Probability of 10-m Wind > 58 mph (%)", fontsize=10, weight="bold")
     cbar.ax.xaxis.set_label_position("top")
     cbar.ax.tick_params(axis="x", which="both", length=0)
 
