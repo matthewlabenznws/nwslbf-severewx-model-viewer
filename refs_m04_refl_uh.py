@@ -1260,7 +1260,7 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
             path_effects=[pe.withStroke(linewidth=2.5, foreground="white")]
         )
 
-        outname = os.path.join(domain_outdir, f"refs_m02_lbf_f{fhr:03d}.png")
+        outname = os.path.join(domain_outdir, f"refs_m04_lbf_f{fhr:03d}.png")
 
         plt.savefig(outname, dpi=140, bbox_inches="tight")
         plt.close(fig)
