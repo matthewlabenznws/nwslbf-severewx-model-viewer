@@ -375,7 +375,7 @@ def refs_grib_url(init_dt, fhr):
     ymd = init_dt.strftime("%Y%m%d")
     hh = init_dt.strftime("%H")
 
-    fname = f"refs.t{hh}z.prob.f{fhr:03d}.conus.grib2"
+    fname = f"refs.t{hh}z.prob.f{fhr:02d}.conus.grib2"
 
     return (
         f"https://noaa-rrfs-pds.s3.amazonaws.com/"
@@ -817,7 +817,7 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
 
         main_title = (
             f"{MODEL_LABEL} | Fill: CAPE > 1500 J/kg Probability | "
-            "Black Contours: 0-6 km Shear > 20.6 m/s Probability"
+            "Black Contours: 0-6 km Shear > 40 kts Probability"
         )
 
         ax.text(
