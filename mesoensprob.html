@@ -217,15 +217,15 @@ button:hover{
                 </option>
 
                 <option value="storm_coverage">
-                    Storm Coverage
+                    Lightning & REFC > 40 Probability
                 </option>
 
                 <option value="organized_severe">
-                    Organized Severe
+                    CAPE > 1500 & 0-6 km Shear > 40 kts Probability
                 </option>
 
                 <option value="wind_prob">
-                    Severe Wind Probability
+                    Wind > 58 mph & REFC > 40 Probability
                 </option>
             </select>
         </div>
@@ -259,9 +259,9 @@ button:hover{
 
         <input
             type="range"
-            min="0"
+            min="1"
             max="60"
-            value="0"
+            value="1"
             id="forecastSlider"
         >
 
@@ -305,7 +305,7 @@ const hourButtons   = document.getElementById("hourButtons");
 
 const viewerTitle   = document.getElementById("viewerTitle");
 
-let currentFhr = 0;
+let currentFhr = 1;
 let animationInterval = null;
 
 function getProductPath(){
@@ -487,7 +487,7 @@ document.getElementById("playBtn")
         currentFhr++;
 
         if(currentFhr > 60){
-            currentFhr = 0;
+            currentFhr = 1;
         }
 
         slider.value = currentFhr;
