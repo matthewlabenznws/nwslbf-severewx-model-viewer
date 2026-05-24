@@ -288,7 +288,7 @@
 </div>
 
 <script>
-const BASE_URL = "https://data.nwslbfmtlsvrwx.com";
+const BASE_URL = "https://mtl-nwslbf-model-data.s3.us-east-2.amazonaws.com";
 
 function runId(run) {
   if (typeof run === "string") return run;
@@ -320,7 +320,7 @@ async function updateHomepage() {
   const hrrr = await getLatestRun("/runs/cams/hrrr/refl_uh");
   const rrfs = await getLatestRun("/runs/cams/rrfs/refl_uh");
   const href = await getLatestRun("/runs/mesoensprob/href/severe_prob");
-  const refs = await getLatestRun("/runs/mesoens/refs/m01/severe_prob");
+  const refs = await getLatestRun("/runs/mesoensprob/refs/severe_prob");
 
   if (hrrr) {
     document.getElementById("hrrrRun").textContent = runLabel(hrrr);
