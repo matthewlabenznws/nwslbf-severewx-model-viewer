@@ -193,7 +193,7 @@ VALID_CYCLES = [0, 6, 12, 18]
 START_FHR = 1
 MAX_FHR = 60
 
-CYCLE_DELAY_MINUTES = 90
+CYCLE_DELAY_MINUTES = 30
 
 PROB_LEVELS = [5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90]
 PROB_TICKS = [5, 10, 20, 30, 40, 50, 60, 70, 80, 90]
@@ -320,23 +320,24 @@ def url_exists(url, timeout=15):
     except Exception:
         return False
 
-def find_latest_cycle(max_back_hours=96):
+def find_latest_available_refs_cycle(max_back_hours=48):
     now = datetime.now(timezone.utc) - timedelta(minutes=CYCLE_DELAY_MINUTES)
 
     for back in range(max_back_hours + 1):
         dt = now - timedelta(hours=back)
 
-        if dt.hour not in VALID_CYCLES:
+        if dt.hour not in VALID_REFS_CYCLES:
             continue
 
         dt = dt.replace(minute=0, second=0, microsecond=0, tzinfo=None)
 
-        test_url = grib_url(dt, 1) + ".idx"
+        for test_fhr in CYCLE_TEST_FHRS:
+            test_url = refs_grib_url(dt, test_fhr) + ".idx"
 
-        if url_exists(test_url):
-            print(f"Latest {MODEL_LABEL} cycle found: {dt:%Y%m%d} {dt:%HZ}")
-            print("Matched IDX:", test_url)
-            return dt
+            if url_exists(test_url):
+                print(f"Latest {MODEL_LABEL} cycle found: {dt:%Y%m%d} {dt:%HZ}")
+                print("Matched IDX:", test_url)
+                return dt
 
     raise RuntimeError(f"Could not find recent {MODEL_LABEL} cycle.")
 
