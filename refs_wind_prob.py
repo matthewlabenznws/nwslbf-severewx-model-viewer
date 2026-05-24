@@ -306,7 +306,7 @@ def grib_url(init_dt, fhr):
     ymd = init_dt.strftime("%Y%m%d")
     hh = init_dt.strftime("%H")
 
-    fname = f"refs.t{hh}z.prob.f{fhr:03d}.conus.grib2"
+    fname = f"refs.t{hh}z.prob.f{fhr:02d}.conus.grib2"
 
     return (
         f"https://noaa-rrfs-pds.s3.amazonaws.com/"
@@ -712,7 +712,7 @@ def plot_domain(fields, domain_key, cfg, fhr):
     valid_dt = init_dt + timedelta(hours=fhr)
 
     main_title = (
-        f"{MODEL_LABEL} | Fill: 10-m Wind > 25.72 m/s Probability | "
+        f"{MODEL_LABEL} | Fill: 10-m Wind > 58 mph Probability | "
         "Black Contours: Composite Reflectivity > 40 dBZ Probability"
     )
 
@@ -767,7 +767,7 @@ def plot_domain(fields, domain_key, cfg, fhr):
     )
 
     cbar.set_label(
-        "Probability of 10-m Wind > 25.72 m/s (~58 mph) (%)",
+        "Probability of 10-m Wind > 58 mph (%)",
         fontsize=10,
         weight="bold"
     )
