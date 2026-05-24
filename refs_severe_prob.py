@@ -244,7 +244,7 @@ START_FHR = 1
 MAX_FHR = 60
 
 # Increased from 90 to 150 min so REFS has more time to populate.
-CYCLE_DELAY_MINUTES = 150
+CYCLE_DELAY_MINUTES = 30
 
 # Test more than just F001 when deciding if a cycle exists.
 CYCLE_TEST_FHRS = [1, 2, 3, 6, 12]
@@ -395,12 +395,8 @@ def url_exists(url, timeout=15):
         return False
 
 
-def find_latest_available_refs_cycle(max_back_hours=120):
+def find_latest_available_refs_cycle(max_back_hours=48):
     now = datetime.now(timezone.utc) - timedelta(minutes=CYCLE_DELAY_MINUTES)
-
-    print(f"Searching for latest {MODEL_LABEL} cycle. Search time: {now:%Y-%m-%d %HZ}")
-    print(f"Valid cycles: {VALID_REFS_CYCLES}")
-    print(f"Testing forecast hours: {CYCLE_TEST_FHRS}")
 
     for back in range(max_back_hours + 1):
         dt = now - timedelta(hours=back)
@@ -412,7 +408,6 @@ def find_latest_available_refs_cycle(max_back_hours=120):
 
         for test_fhr in CYCLE_TEST_FHRS:
             test_url = refs_grib_url(dt, test_fhr) + ".idx"
-            print("Checking:", test_url)
 
             if url_exists(test_url):
                 print(f"Latest {MODEL_LABEL} cycle found: {dt:%Y%m%d} {dt:%HZ}")
