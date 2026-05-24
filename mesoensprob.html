@@ -1,583 +1,513 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>MESO-ENS PROB Viewer</title>
+<meta charset="utf-8">
+<title>NWS LBF Severe Weather Model Viewer</title>
 
-  <style>
-    body {
-      margin: 0;
-      background: linear-gradient(to bottom, #111 0%, #080808 100%);
-      color: white;
-      font-family: Arial, sans-serif;
-      text-align: center;
+<style>
+body{
+    margin:0;
+    background:linear-gradient(to bottom,#111 0%,#080808 100%);
+    color:white;
+    font-family:Arial,sans-serif;
+}
+
+.navbar{
+    background:#1a1a1a;
+    padding:14px 24px;
+    border-bottom:1px solid #333;
+    font-size:22px;
+    font-weight:bold;
+}
+
+.navbar a{
+    color:white;
+    text-decoration:none;
+    margin:0 8px;
+}
+
+.navbar a:hover{
+    color:#6ea8ff;
+}
+
+.navbar span{
+    color:#777;
+}
+
+.topbar{
+    padding:16px 18px;
+    border-bottom:1px solid #333;
+    background:#121212;
+}
+
+.viewer-title{
+    font-size:26px;
+    font-weight:800;
+    margin-bottom:18px;
+    text-align:center;
+}
+
+.controls{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:18px;
+    flex-wrap:wrap;
+}
+
+.control-group{
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+
+.control-group label{
+    font-size:18px;
+    font-weight:bold;
+}
+
+select{
+    background:#232323;
+    color:white;
+    border:1px solid #444;
+    border-radius:8px;
+    padding:10px 14px;
+    font-size:16px;
+    font-weight:bold;
+}
+
+.slider-wrap{
+    padding:14px 18px;
+    border-bottom:1px solid #333;
+    background:#111;
+}
+
+.slider-row{
+    display:flex;
+    align-items:center;
+    gap:14px;
+}
+
+button{
+    background:#232323;
+    border:1px solid #444;
+    color:white;
+    padding:10px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:bold;
+}
+
+button:hover{
+    background:#2d2d2d;
+}
+
+#forecastSlider{
+    flex:1;
+}
+
+#forecastLabel{
+    font-size:18px;
+    font-weight:bold;
+    width:42px;
+}
+
+.hour-buttons{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    padding:14px 14px 0 14px;
+    justify-content:center;
+}
+
+.hour-btn{
+    min-width:48px;
+    background:#3b82f6;
+    border:1px solid #7eaefc;
+}
+
+.hour-btn.active{
+    background:white;
+    color:black;
+}
+
+.image-container{
+    text-align:center;
+    padding:18px 10px 40px 10px;
+}
+
+#mainImage{
+    width:95%;
+    max-width:1700px;
+    border-radius:10px;
+    box-shadow:0 0 18px rgba(0,0,0,0.45);
+    background:black;
+}
+
+.footer{
+    color:#777;
+    text-align:center;
+    padding:34px 0 50px 0;
+    line-height:1.6;
+    font-size:15px;
+}
+
+@media(max-width:900px){
+
+    .viewer-title{
+        font-size:22px;
     }
 
-    .navbar {
-      background: #1a1a1a;
-      padding: 14px 24px;
-      border-bottom: 1px solid #333;
-      text-align: left;
-      font-size: 22px;
-      font-weight: bold;
+    .controls{
+        gap:10px;
     }
 
-    .navbar a {
-      color: white;
-      text-decoration: none;
-      margin: 0 8px;
-      transition: 0.2s ease;
+    .control-group label{
+        font-size:16px;
     }
 
-    .navbar a:hover {
-      color: #6ea8ff;
-      text-shadow: 0 0 10px rgba(110,168,255,0.35);
+    select{
+        font-size:14px;
     }
 
-    .navbar span {
-      color: #777;
+    .navbar{
+        font-size:18px;
     }
 
-    .topbar {
-      background: #1b1b1b;
-      padding: 14px 18px;
-      border-bottom: 1px solid #333;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: center;
-      gap: 14px;
+    #mainImage{
+        width:100%;
     }
-
-    select, button {
-      background: #2c2c2c;
-      color: white;
-      border: 1px solid #555;
-      padding: 7px 12px;
-      border-radius: 6px;
-      font-weight: bold;
-      transition: 0.2s ease;
-    }
-
-    select:hover, button:hover {
-      border-color: #6ea8ff;
-      box-shadow: 0 0 10px rgba(110,168,255,0.2);
-    }
-
-    .topbar label {
-      font-weight: bold;
-    }
-
-    #memberBlock {
-      display: none;
-    }
-
-    #viewerTitle {
-      font-size: 22px;
-      font-weight: 800;
-      margin-right: 18px;
-    }
-
-    .controls {
-      display: grid;
-      grid-template-columns: auto auto 1fr auto;
-      gap: 12px;
-      padding: 12px 16px;
-      background: #181818;
-      border-bottom: 1px solid #2c2c2c;
-    }
-
-    input[type="range"] {
-      width: 100%;
-    }
-
-    .tiles {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 4px;
-      padding: 6px 10px 2px 10px;
-      background: #101010;
-    }
-
-    .frame {
-      min-width: 44px;
-      padding: 6px 9px;
-      border-radius: 5px;
-      transition: 0.2s ease;
-    }
-
-    .available {
-      background: #2b7cff;
-      color: white;
-      border-color: #9ec0ff;
-      cursor: pointer;
-    }
-
-    .available:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 0 12px rgba(110,168,255,0.35);
-    }
-
-    .missing {
-      background: #111;
-      color: #aaa;
-      border-color: #555;
-    }
-
-    .frame:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-    }
-
-    .active {
-      outline: 2px solid white;
-    }
-
-    .plot-wrap {
-      padding: 12px 16px 40px 16px;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-    }
-
-    #plot {
-      width: auto;
-      max-width: 96vw;
-      height: auto;
-      max-height: none;
-      border: 1px solid #333;
-      border-radius: 10px;
-      background: #000;
-      box-shadow: 0 0 22px rgba(0,0,0,0.45);
-      image-rendering: auto;
-    }
-
-    .footer {
-      color: #777;
-      font-size: 15px;
-      margin: 28px 0 34px 0;
-      line-height: 1.6;
-    }
-
-    @media (max-width: 700px) {
-      .navbar {
-        font-size: 18px;
-      }
-
-      #viewerTitle {
-        width: 100%;
-        margin-bottom: 8px;
-      }
-
-      .controls {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
+}
+</style>
 </head>
 
 <body>
 
 <div class="navbar">
-  <a href="index.html">HOME</a>
-  <span>/</span>
-  <a href="cams.html">CAMs</a>
-  <span>/</span>
-  <a href="mesoensprob.html">MESO-ENS PROB</a>
+    <a href="index.html">HOME</a>
+    <span>/</span>
+    <a href="cams.html">CAMs</a>
+    <span>/</span>
+    <a href="mesoensprob.html">MESO-ENS PROB</a>
 </div>
 
 <div class="topbar">
 
-  <b id="viewerTitle">HREF UH > 75 & REFC > 40 Probability</b>
+    <div class="viewer-title" id="viewerTitle">
+        REFS Severe Probability
+    </div>
 
-  <label>Model:</label>
-  <select id="modelSelect" onchange="changeModel()">
-    <option value="href">HREF</option>
-    <option value="refs">REFS</option>
-  </select>
+    <div class="controls">
 
-  <span id="memberBlock">
-    <label>Member:</label>
-    <select id="memberSelect" onchange="changeMember()">
-      <option value="m01">M01</option>
-    </select>
-  </span>
+        <div class="control-group">
+            <label>Model:</label>
 
-  <label>Product:</label>
-  <select id="productSelect" onchange="changeProduct()"></select>
+            <select id="modelSelect">
+                <option value="refs">REFS</option>
+                <option value="href">HREF</option>
+            </select>
+        </div>
 
-  <label>Run:</label>
-  <select id="runSelect" onchange="changeRun()"></select>
+        <div class="control-group">
+            <label>Product:</label>
 
-  <label>Domain:</label>
-  <select id="domainSelect" onchange="changeDomain()">
-    <option value="regional">Regional</option>
-    <option value="lbf">LBF</option>
-    <option value="central_plains">Central Plains</option>
-    <option value="spc_severe">SPC Severe</option>
-  </select>
+            <select id="productSelect">
+                <option value="severe_prob">
+                    UH > 75 & REFC > 40 Probability
+                </option>
 
+                <option value="storm_coverage">
+                    Storm Coverage
+                </option>
+
+                <option value="organized_severe">
+                    Organized Severe
+                </option>
+
+                <option value="wind_prob">
+                    Severe Wind Probability
+                </option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Run:</label>
+
+            <select id="runSelect"></select>
+        </div>
+
+        <div class="control-group">
+            <label>Domain:</label>
+
+            <select id="domainSelect">
+                <option value="regional">Regional</option>
+                <option value="lbf">LBF</option>
+                <option value="central_plains">Central Plains</option>
+            </select>
+        </div>
+
+    </div>
 </div>
 
-<div class="controls">
-  <button onclick="togglePlay()" id="playBtn">▶ Play</button>
-  <button onclick="latestRun()">Latest</button>
-  <input id="slider" type="range" min="0" max="48" value="0">
-  <div id="fhrLabel">00</div>
+<div class="slider-wrap">
+
+    <div class="slider-row">
+
+        <button id="playBtn">▶ Play</button>
+
+        <button id="latestBtn">Latest</button>
+
+        <input
+            type="range"
+            min="0"
+            max="60"
+            value="0"
+            id="forecastSlider"
+        >
+
+        <div id="forecastLabel">000</div>
+
+    </div>
 </div>
 
-<div class="tiles" id="tiles"></div>
+<div class="hour-buttons" id="hourButtons"></div>
 
-<div class="plot-wrap">
-  <img id="plot" src="">
+<div class="image-container">
+
+    <img
+        id="mainImage"
+        src=""
+        alt="Forecast image"
+    >
+
 </div>
 
 <div class="footer">
-  Developed by Matthew Labenz<br>
-  NWS North Platte, Nebraska
+    Developed by Matthew Labenz<br>
+    NWS North Platte, Nebraska
 </div>
 
 <script>
-const BASE_URL = "https://mtl-nwslbf-model-data.s3.us-east-2.amazonaws.com";
 
-let selectedModel = "href";
-let selectedMember = "m01";
-let selectedProduct = "severe_prob";
-let selectedRun = "";
-let selectedDomain = "regional";
+const BASE_URL =
+"https://mtl-nwslbf-model-data.s3.us-east-2.amazonaws.com";
 
-let current = 0;
-let maxFhr = 48;
-let availableFrames = [];
-let playing = false;
-let timer = null;
-let runs = [];
-
-const modelSelect = document.getElementById("modelSelect");
-const memberSelect = document.getElementById("memberSelect");
-const memberBlock = document.getElementById("memberBlock");
+const modelSelect   = document.getElementById("modelSelect");
 const productSelect = document.getElementById("productSelect");
-const runSelect = document.getElementById("runSelect");
-const domainSelect = document.getElementById("domainSelect");
-const slider = document.getElementById("slider");
-const plot = document.getElementById("plot");
-const tiles = document.getElementById("tiles");
-const fhrLabel = document.getElementById("fhrLabel");
-const playBtn = document.getElementById("playBtn");
-const viewerTitle = document.getElementById("viewerTitle");
+const runSelect     = document.getElementById("runSelect");
+const domainSelect  = document.getElementById("domainSelect");
 
-function addProductOption(value, label) {
-  const opt = document.createElement("option");
-  opt.value = value;
-  opt.textContent = label;
-  productSelect.appendChild(opt);
-}
+const slider        = document.getElementById("forecastSlider");
+const label         = document.getElementById("forecastLabel");
 
-function updateProductOptions() {
-  productSelect.innerHTML = "";
+const image         = document.getElementById("mainImage");
+const hourButtons   = document.getElementById("hourButtons");
 
-  addProductOption("severe_prob", "UH > 75 & REFC > 40 Probability");
-  addProductOption("storm_coverage", "Lightning > 0.2 & REFC > 40 Probability");
-  addProductOption("organized_severe", "CAPE > 1500 & 0–6 km Shear > 40 kt Probability");
-  addProductOption("tornado_rotation", "0–3 km Helicity > 200 & 2–5 km UH > 75 Probability");
-  addProductOption("wind_prob", "10m Wind Gust > 58 mph Probability");
+const viewerTitle   = document.getElementById("viewerTitle");
 
-  const values = Array.from(productSelect.options).map(o => o.value);
+let currentFhr = 0;
+let animationInterval = null;
 
-  if (!values.includes(selectedProduct)) {
-    selectedProduct = values[0] || "severe_prob";
-  }
+function getProductPath(){
 
-  productSelect.value = selectedProduct;
-}
+    const model   = modelSelect.value;
+    const product = productSelect.value;
 
-function updateMemberVisibility() {
-  memberBlock.style.display =
-    selectedModel === "refs" ? "inline-flex" : "none";
-}
-
-function productLabel() {
-  return productSelect.options[productSelect.selectedIndex]?.text || "";
-}
-
-function updateTitle() {
-  let modelLabel = selectedModel.toUpperCase();
-
-  if (selectedModel === "refs") {
-    modelLabel = "REFS " + selectedMember.toUpperCase();
-  }
-
-  viewerTitle.textContent = modelLabel + " " + productLabel();
-}
-
-function getProductPath() {
-  if (selectedModel === "href") {
-    return `/runs/mesoensprob/href/${selectedProduct}`;
-  }
-
-  return `/runs/mesoens/refs/${selectedMember}/${selectedProduct}`;
-}
-
-function getFileName(fhr) {
-  if (selectedModel === "href") {
-    const f = String(fhr).padStart(2, "0");
-    return `href_${selectedProduct}_f${f}.png`;
-  }
-
-  const f = String(fhr).padStart(3, "0");
-  return `refs_${selectedMember}_${selectedProduct}_f${f}.png`;
-}
-
-function imgSrc(fhr) {
-  if (!selectedRun) return "";
-
-  return (
-    BASE_URL +
-    getProductPath() +
-    "/" +
-    selectedRun +
-    "/" +
-    selectedDomain +
-    "/" +
-    getFileName(fhr) +
-    "?t=" +
-    Date.now()
-  );
-}
-
-function runId(run) {
-  if (typeof run === "string") return run;
-  return run.id;
-}
-
-function runLabel(run) {
-  if (typeof run === "string") return run.replace("_", " ");
-  return run.label || run.id;
-}
-
-async function loadRunsJson() {
-  const path =
-    BASE_URL +
-    getProductPath() +
-    "/runs.json?t=" +
-    Date.now();
-
-  try {
-    const response = await fetch(path);
-    const data = await response.json();
-
-    runs = data.runs || [];
-
-    if (runs.length > 0) {
-      selectedRun = runId(runs[0]);
-    } else {
-      selectedRun = "";
+    if(model === "href"){
+        return `/runs/mesoensprob/href/${product}`;
     }
 
-  } catch(err) {
-    console.error("Could not load runs.json:", path, err);
-    runs = [];
-    selectedRun = "";
-  }
+    return `/runs/mesoensprob/refs/${product}`;
 }
 
-function populateRunDropdown() {
-  runSelect.innerHTML = "";
+async function loadRuns(){
 
-  runs.forEach(run => {
-    const opt = document.createElement("option");
-    opt.value = runId(run);
-    opt.textContent = runLabel(run);
-    runSelect.appendChild(opt);
-  });
+    const path = getProductPath();
 
-  runSelect.value = selectedRun;
+    try{
+
+        const response =
+            await fetch(BASE_URL + path + "/runs.json?t=" + Date.now());
+
+        const data = await response.json();
+
+        runSelect.innerHTML = "";
+
+        (data.runs || []).forEach(run => {
+
+            const option = document.createElement("option");
+
+            option.value = run.id || run;
+
+            option.textContent = run.label || run.id || run;
+
+            runSelect.appendChild(option);
+
+        });
+
+        updateImage();
+
+    }catch(err){
+
+        console.error(err);
+
+    }
 }
 
-function updateMaxFhrForRun() {
-  const runObj = runs.find(r => runId(r) === selectedRun);
+function getFileName(fhr){
 
-  if (
-    runObj &&
-    typeof runObj !== "string" &&
-    runObj.max_fhr !== undefined
-  ) {
-    maxFhr = Number(runObj.max_fhr);
-  } else {
-    maxFhr = selectedModel === "href" ? 48 : 60;
-  }
+    const model   = modelSelect.value;
+    const product = productSelect.value;
 
-  slider.max = maxFhr;
+    if(model === "href"){
+
+        const f = String(fhr).padStart(2,"0");
+
+        return `href_${product}_f${f}.png`;
+    }
+
+    const f = String(fhr).padStart(3,"0");
+
+    return `refs_${product}_f${f}.png`;
 }
 
-async function refreshHourAvailability() {
-  tiles.innerHTML = "";
-  availableFrames = [];
+function updateTitle(){
 
-  updateMaxFhrForRun();
+    const model =
+        modelSelect.value.toUpperCase();
 
-  for (let f = 0; f <= maxFhr; f++) {
-    const button = document.createElement("button");
+    const productText =
+        productSelect.options[
+            productSelect.selectedIndex
+        ].text;
 
-    button.className = "frame missing";
-    button.textContent =
-      selectedModel === "href"
-      ? String(f).padStart(2, "0")
-      : String(f).padStart(3, "0");
-
-    button.disabled = true;
-
-    try {
-      const response = await fetch(imgSrc(f), { method: "HEAD" });
-
-      if (response.ok) {
-        availableFrames.push(f);
-        button.disabled = false;
-        button.className = "frame available";
-        button.onclick = () => setFrame(f);
-      }
-
-    } catch(err) {}
-
-    tiles.appendChild(button);
-  }
+    viewerTitle.textContent =
+        `${model} ${productText}`;
 }
 
-function firstAvailableFrame() {
-  return availableFrames.length > 0 ? availableFrames[0] : 0;
+function updateImage(){
+
+    const model   = modelSelect.value;
+    const product = productSelect.value;
+    const run     = runSelect.value;
+    const domain  = domainSelect.value;
+
+    const fileName = getFileName(currentFhr);
+
+    const path =
+        BASE_URL +
+        getProductPath() +
+        `/${run}/${domain}/${fileName}?t=${Date.now()}`;
+
+    image.src = path;
+
+    label.textContent =
+        String(currentFhr).padStart(3,"0");
+
+    updateButtons();
+
+    updateTitle();
 }
 
-function setFrame(fhr) {
-  if (!selectedRun) return;
+function updateButtons(){
 
-  current = fhr;
-  slider.value = current;
+    document.querySelectorAll(".hour-btn")
+        .forEach(btn => {
 
-  fhrLabel.textContent =
-    selectedModel === "href"
-    ? String(current).padStart(2, "0")
-    : String(current).padStart(3, "0");
+            btn.classList.remove("active");
 
-  plot.src = imgSrc(current);
+            if(Number(btn.dataset.hour) === currentFhr){
+                btn.classList.add("active");
+            }
+        });
+}
 
-  document.querySelectorAll(".frame").forEach((btn, idx) => {
-    btn.classList.remove("active");
-    if (idx === current) btn.classList.add("active");
-  });
+function buildHourButtons(){
+
+    hourButtons.innerHTML = "";
+
+    for(let i=0;i<=60;i++){
+
+        const btn = document.createElement("button");
+
+        btn.className = "hour-btn";
+
+        btn.textContent =
+            String(i).padStart(3,"0");
+
+        btn.dataset.hour = i;
+
+        btn.onclick = () => {
+
+            currentFhr = i;
+
+            slider.value = i;
+
+            updateImage();
+
+        };
+
+        hourButtons.appendChild(btn);
+    }
 }
 
 slider.addEventListener("input", () => {
-  const f = parseInt(slider.value);
 
-  if (availableFrames.includes(f)) {
-    setFrame(f);
-  } else {
-    slider.value = current;
-  }
+    currentFhr = Number(slider.value);
+
+    updateImage();
+
 });
 
-function togglePlay() {
-  playing = !playing;
+document.getElementById("latestBtn")
+.addEventListener("click", () => {
 
-  playBtn.textContent =
-    playing ? "⏸ Pause" : "▶ Play";
+    currentFhr = 60;
 
-  if (!playing) {
-    clearInterval(timer);
-    return;
-  }
+    slider.value = 60;
 
-  timer = setInterval(() => {
-    if (availableFrames.length === 0) return;
+    updateImage();
 
-    let idx = availableFrames.indexOf(current);
-    idx++;
+});
 
-    if (idx >= availableFrames.length) idx = 0;
+document.getElementById("playBtn")
+.addEventListener("click", () => {
 
-    setFrame(availableFrames[idx]);
+    if(animationInterval){
 
-  }, 700);
-}
+        clearInterval(animationInterval);
 
-async function refreshViewer() {
-  await loadRunsJson();
-  populateRunDropdown();
-  await refreshHourAvailability();
-}
+        animationInterval = null;
 
-async function latestRun() {
-  selectedRun = "";
-  await refreshViewer();
-  setFrame(firstAvailableFrame());
-}
+        return;
+    }
 
-async function changeModel() {
-  selectedModel = modelSelect.value;
-  selectedRun = "";
-  plot.src = "";
+    animationInterval = setInterval(() => {
 
-  maxFhr = selectedModel === "href" ? 48 : 60;
+        currentFhr++;
 
-  updateMemberVisibility();
-  updateProductOptions();
-  updateTitle();
+        if(currentFhr > 60){
+            currentFhr = 0;
+        }
 
-  await refreshViewer();
-  setFrame(firstAvailableFrame());
-}
+        slider.value = currentFhr;
 
-async function changeMember() {
-  selectedMember = memberSelect.value;
-  selectedRun = "";
-  plot.src = "";
+        updateImage();
 
-  updateTitle();
+    },500);
 
-  await refreshViewer();
-  setFrame(firstAvailableFrame());
-}
+});
 
-async function changeProduct() {
-  selectedProduct = productSelect.value;
-  selectedRun = "";
-  plot.src = "";
+modelSelect.addEventListener("change", loadRuns);
+productSelect.addEventListener("change", loadRuns);
 
-  updateTitle();
+runSelect.addEventListener("change", updateImage);
+domainSelect.addEventListener("change", updateImage);
 
-  await refreshViewer();
-  setFrame(firstAvailableFrame());
-}
+buildHourButtons();
 
-async function changeRun() {
-  selectedRun = runSelect.value;
+loadRuns();
 
-  await refreshHourAvailability();
-  setFrame(firstAvailableFrame());
-}
-
-async function changeDomain() {
-  selectedDomain = domainSelect.value;
-
-  await refreshHourAvailability();
-  setFrame(firstAvailableFrame());
-}
-
-async function init() {
-  updateMemberVisibility();
-  updateProductOptions();
-  updateTitle();
-
-  await refreshViewer();
-  setFrame(firstAvailableFrame());
-
-  setInterval(async () => {
-    await refreshViewer();
-  }, 30000);
-}
-
-init();
 </script>
 
 </body>
