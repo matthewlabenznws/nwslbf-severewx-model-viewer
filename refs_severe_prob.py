@@ -1,5 +1,5 @@
 # ============================================================
-# REFS | R2 Meso-Ensemble Probability Product
+# REFS | AWS S3 Meso-Ensemble Probability Product
 # Severe Storm Probability
 # Fill: 2-5 km UH > 75 probability
 # Contours: Composite Reflectivity > 40 dBZ probability
@@ -29,7 +29,6 @@ from shapely.prepared import prep
 from scipy.ndimage import gaussian_filter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from datetime import datetime, timedelta, timezone
-from botocore.config import Config
 
 
 # ============================================================
@@ -55,7 +54,7 @@ SECTION_KEY = "mesoensprob"
 MODEL_KEY = "refs"
 PRODUCT_KEY = "severe_prob"
 
-R2_PRODUCT_PATH = f"runs/{SECTION_KEY}/{MODEL_KEY}/{PRODUCT_KEY}"
+S3_PRODUCT_PATH = f"runs/{SECTION_KEY}/{MODEL_KEY}/{PRODUCT_KEY}"
 
 OUTDIR_BASE = os.path.join(
     "site",
@@ -70,7 +69,7 @@ os.makedirs(OUTDIR_BASE, exist_ok=True)
 
 
 # ============================================================
-# R2 SETUP
+# AWS S3 SETUP
 # ============================================================
 
 BUCKET = os.environ["AWS_BUCKET"]
@@ -83,14 +82,14 @@ s3 = boto3.client(
 )
 
 
-def upload_to_r2(local_file, remote_key, content_type="image/png"):
+def upload_to_s3(local_file, remote_key, content_type="image/png"):
     s3.upload_file(
         local_file,
         BUCKET,
         remote_key,
         ExtraArgs={"ContentType": content_type}
     )
-    print("Uploaded to R2:", remote_key)
+    print("Uploaded to S3:", remote_key)
 
 
 # ============================================================
@@ -244,7 +243,11 @@ VALID_REFS_CYCLES = [0, 6, 12, 18]
 START_FHR = 1
 MAX_FHR = 60
 
-CYCLE_DELAY_MINUTES = 90
+# Increased from 90 to 150 min so REFS has more time to populate.
+CYCLE_DELAY_MINUTES = 150
+
+# Test more than just F001 when deciding if a cycle exists.
+CYCLE_TEST_FHRS = [1, 2, 3, 6, 12]
 
 PROB_LEVELS = [5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90]
 PROB_TICKS = [5, 10, 20, 30, 40, 50, 60, 70, 80, 90]
@@ -392,8 +395,12 @@ def url_exists(url, timeout=15):
         return False
 
 
-def find_latest_available_refs_cycle(max_back_hours=96):
+def find_latest_available_refs_cycle(max_back_hours=120):
     now = datetime.now(timezone.utc) - timedelta(minutes=CYCLE_DELAY_MINUTES)
+
+    print(f"Searching for latest {MODEL_LABEL} cycle. Search time: {now:%Y-%m-%d %HZ}")
+    print(f"Valid cycles: {VALID_REFS_CYCLES}")
+    print(f"Testing forecast hours: {CYCLE_TEST_FHRS}")
 
     for back in range(max_back_hours + 1):
         dt = now - timedelta(hours=back)
@@ -403,12 +410,14 @@ def find_latest_available_refs_cycle(max_back_hours=96):
 
         dt = dt.replace(minute=0, second=0, microsecond=0, tzinfo=None)
 
-        test_url = refs_grib_url(dt, 1) + ".idx"
+        for test_fhr in CYCLE_TEST_FHRS:
+            test_url = refs_grib_url(dt, test_fhr) + ".idx"
+            print("Checking:", test_url)
 
-        if url_exists(test_url):
-            print(f"Latest {MODEL_LABEL} cycle found: {dt:%Y%m%d} {dt:%HZ}")
-            print("Matched IDX:", test_url)
-            return dt
+            if url_exists(test_url):
+                print(f"Latest {MODEL_LABEL} cycle found: {dt:%Y%m%d} {dt:%HZ}")
+                print("Matched IDX:", test_url)
+                return dt
 
     raise RuntimeError(f"Could not find recent {MODEL_LABEL} cycle.")
 
@@ -587,6 +596,61 @@ def subset_2d(lat, lon, *fields):
 
 
 # ============================================================
+# RUNS.JSON
+# ============================================================
+
+def upload_runs_json(init_dt, cycle_str, max_fhr):
+    old_runs = []
+
+    try:
+        obj = s3.get_object(
+            Bucket=BUCKET,
+            Key=f"{S3_PRODUCT_PATH}/runs.json"
+        )
+
+        old_data = json.loads(obj["Body"].read().decode("utf-8"))
+        old_runs = old_data.get("runs", [])
+
+    except Exception:
+        old_runs = []
+
+    new_run = {
+        "id": cycle_str,
+        "label": init_dt.strftime("%Y-%m-%d %Hz"),
+        "max_fhr": max_fhr,
+    }
+
+    combined = [new_run]
+
+    for r in old_runs:
+        if isinstance(r, str):
+            rid = r
+            combined.append({
+                "id": rid,
+                "label": rid.replace("_", " "),
+                "max_fhr": max_fhr,
+            })
+
+        elif r.get("id") != cycle_str:
+            combined.append(r)
+
+    runs_json = {
+        "runs": combined[:4]
+    }
+
+    with open("runs.json", "w") as f:
+        json.dump(runs_json, f, indent=2)
+
+    upload_to_s3(
+        "runs.json",
+        f"{S3_PRODUCT_PATH}/runs.json",
+        content_type="application/json"
+    )
+
+    print("Uploaded runs.json with last 4 REFS severe prob runs.")
+
+
+# ============================================================
 # FIND REFS CYCLE
 # ============================================================
 
@@ -597,6 +661,8 @@ OUTDIR = os.path.join(OUTDIR_BASE, cycle_str)
 os.makedirs(OUTDIR, exist_ok=True)
 
 fhrs = range(START_FHR, MAX_FHR + 1)
+
+upload_runs_json(init_dt, cycle_str, MAX_FHR)
 
 print(f"Using {MODEL_LABEL} init:", init_dt.strftime("%Y-%m-%d %HZ"))
 
@@ -860,13 +926,13 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
     filename = os.path.basename(outname)
 
     remote_key = (
-        f"{R2_PRODUCT_PATH}/"
+        f"{S3_PRODUCT_PATH}/"
         f"{cycle_str}/"
         f"{domain_key}/"
         f"{filename}"
     )
 
-    upload_to_r2(outname, remote_key)
+    upload_to_s3(outname, remote_key)
 
 
 # ============================================================
@@ -884,4 +950,4 @@ for fhr in fhrs:
     except Exception as e:
         print(f"FAILED F{fhr:03d}: {e}")
 
-print("Done. Uploaded REFS severe probability to R2:", R2_PRODUCT_PATH)
+print("Done. Uploaded REFS severe probability to S3:", S3_PRODUCT_PATH)
