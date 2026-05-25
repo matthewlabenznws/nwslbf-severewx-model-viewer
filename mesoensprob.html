@@ -131,6 +131,18 @@ button:hover{
     color:black;
 }
 
+.hour-btn.disabled-hour{
+    background:#111;
+    color:#555;
+    border:1px solid #333;
+    cursor:not-allowed;
+    opacity:0.75;
+}
+
+.hour-btn.disabled-hour:hover{
+    background:#111;
+}
+
 .image-container{
     text-align:center;
     padding:18px 10px 40px 10px;
@@ -139,6 +151,7 @@ button:hover{
 #mainImage{
     width:80%;
     max-width:1300px;
+    max-height:85vh;
     border-radius:10px;
     box-shadow:0 0 18px rgba(0,0,0,0.45);
     background:black;
@@ -201,7 +214,6 @@ button:hover{
 
         <div class="control-group">
             <label>Model:</label>
-
             <select id="modelSelect">
                 <option value="refs">REFS</option>
                 <option value="href">HREF</option>
@@ -210,35 +222,21 @@ button:hover{
 
         <div class="control-group">
             <label>Product:</label>
-
             <select id="productSelect">
-                <option value="severe_prob">
-                    UH > 75 & REFC > 40 Probability
-                </option>
-
-                <option value="storm_coverage">
-                    Lightning & REFC > 40 Probability
-                </option>
-
-                <option value="organized_severe">
-                    CAPE > 1500 & 0-6 km Shear > 40 kts Probability
-                </option>
-
-                <option value="wind_prob">
-                    Wind > 58 mph & REFC > 40 Probability
-                </option>
+                <option value="severe_prob">UH > 75 & REFC > 40 Probability</option>
+                <option value="storm_coverage">Lightning & REFC > 40 Probability</option>
+                <option value="organized_severe">CAPE > 1500 & 0-6 km Shear > 40 kts Probability</option>
+                <option value="wind_prob">Wind > 58 mph & REFC > 40 Probability</option>
             </select>
         </div>
 
         <div class="control-group">
             <label>Run:</label>
-
             <select id="runSelect"></select>
         </div>
 
         <div class="control-group">
             <label>Domain:</label>
-
             <select id="domainSelect">
                 <option value="regional">Regional</option>
                 <option value="lbf">LBF</option>
@@ -250,36 +248,18 @@ button:hover{
 </div>
 
 <div class="slider-wrap">
-
     <div class="slider-row">
-
         <button id="playBtn">▶ Play</button>
-
         <button id="latestBtn">Latest</button>
-
-        <input
-            type="range"
-            min="1"
-            max="60"
-            value="1"
-            id="forecastSlider"
-        >
-
-        <div id="forecastLabel">000</div>
-
+        <input type="range" min="1" max="60" value="1" id="forecastSlider">
+        <div id="forecastLabel">001</div>
     </div>
 </div>
 
 <div class="hour-buttons" id="hourButtons"></div>
 
 <div class="image-container">
-
-    <img
-        id="mainImage"
-        src=""
-        alt="Forecast image"
-    >
-
+    <img id="mainImage" src="" alt="Forecast image">
 </div>
 
 <div class="footer">
@@ -306,10 +286,11 @@ const hourButtons   = document.getElementById("hourButtons");
 const viewerTitle   = document.getElementById("viewerTitle");
 
 let currentFhr = 1;
+let maxFhr = 60;
+let runs = [];
 let animationInterval = null;
 
 function getProductPath(){
-
     const model   = modelSelect.value;
     const product = productSelect.value;
 
@@ -320,37 +301,77 @@ function getProductPath(){
     return `/runs/mesoensprob/refs/${product}`;
 }
 
+function getRunId(run){
+    if(typeof run === "string") return run;
+    return run.id;
+}
+
+function getRunLabel(run){
+    if(typeof run === "string") return run.replace("_"," ");
+    return run.label || run.id;
+}
+
+function getSelectedRunObject(){
+    return runs.find(r => getRunId(r) === runSelect.value);
+}
+
+function updateMaxFhr(){
+    const runObj = getSelectedRunObject();
+
+    if(runObj && typeof runObj !== "string" && runObj.max_fhr !== undefined){
+        maxFhr = Number(runObj.max_fhr);
+    } else {
+        maxFhr = modelSelect.value === "href" ? 48 : 60;
+    }
+
+    slider.max = maxFhr;
+
+    if(currentFhr > maxFhr){
+        currentFhr = maxFhr;
+    }
+
+    if(currentFhr < 1){
+        currentFhr = 1;
+    }
+
+    slider.value = currentFhr;
+}
+
 async function loadRuns(){
 
     const path = getProductPath();
+    const previousRun = runSelect.value;
 
     try{
-
         const response =
             await fetch(BASE_URL + path + "/runs.json?t=" + Date.now());
 
         const data = await response.json();
 
+        runs = data.runs || [];
         runSelect.innerHTML = "";
 
-        (data.runs || []).forEach(run => {
-
+        runs.forEach(run => {
             const option = document.createElement("option");
-
-            option.value = run.id || run;
-
-            option.textContent = run.label || run.id || run;
-
+            option.value = getRunId(run);
+            option.textContent = getRunLabel(run);
             runSelect.appendChild(option);
-
         });
 
+        const runIds = runs.map(r => getRunId(r));
+
+        if(runIds.includes(previousRun)){
+            runSelect.value = previousRun;
+        } else if(runs.length > 0){
+            runSelect.value = getRunId(runs[0]);
+        }
+
+        updateMaxFhr();
+        buildHourButtons();
         updateImage();
 
     }catch(err){
-
         console.error(err);
-
     }
 }
 
@@ -360,14 +381,11 @@ function getFileName(fhr){
     const product = productSelect.value;
 
     if(model === "href"){
-
         const f = String(fhr).padStart(2,"0");
-
         return `href_${product}_f${f}.png`;
     }
 
     const f = String(fhr).padStart(3,"0");
-
     return `refs_${product}_f${f}.png`;
 }
 
@@ -387,10 +405,15 @@ function updateTitle(){
 
 function updateImage(){
 
-    const model   = modelSelect.value;
-    const product = productSelect.value;
+    updateMaxFhr();
+
     const run     = runSelect.value;
     const domain  = domainSelect.value;
+
+    if(!run){
+        image.src = "";
+        return;
+    }
 
     const fileName = getFileName(currentFhr);
 
@@ -405,15 +428,12 @@ function updateImage(){
         String(currentFhr).padStart(3,"0");
 
     updateButtons();
-
     updateTitle();
 }
 
 function updateButtons(){
-
     document.querySelectorAll(".hour-btn")
         .forEach(btn => {
-
             btn.classList.remove("active");
 
             if(Number(btn.dataset.hour) === currentFhr){
@@ -426,85 +446,78 @@ function buildHourButtons(){
 
     hourButtons.innerHTML = "";
 
-    for(let i=0;i<=60;i++){
+    for(let i=1; i<=60; i++){
 
         const btn = document.createElement("button");
 
         btn.className = "hour-btn";
-
-        btn.textContent =
-            String(i).padStart(3,"0");
-
+        btn.textContent = String(i).padStart(3,"0");
         btn.dataset.hour = i;
 
-        btn.onclick = () => {
-
-            currentFhr = i;
-
-            slider.value = i;
-
-            updateImage();
-
-        };
+        if(i > maxFhr){
+            btn.disabled = true;
+            btn.classList.add("disabled-hour");
+        } else {
+            btn.onclick = () => {
+                currentFhr = i;
+                slider.value = i;
+                updateImage();
+            };
+        }
 
         hourButtons.appendChild(btn);
     }
+
+    updateButtons();
 }
 
 slider.addEventListener("input", () => {
-
     currentFhr = Number(slider.value);
-
     updateImage();
-
 });
 
 document.getElementById("latestBtn")
 .addEventListener("click", () => {
-
-    currentFhr = 60;
-
-    slider.value = 60;
-
+    currentFhr = maxFhr;
+    slider.value = currentFhr;
     updateImage();
-
 });
 
 document.getElementById("playBtn")
 .addEventListener("click", () => {
 
     if(animationInterval){
-
         clearInterval(animationInterval);
-
         animationInterval = null;
-
+        document.getElementById("playBtn").textContent = "▶ Play";
         return;
     }
 
-    animationInterval = setInterval(() => {
+    document.getElementById("playBtn").textContent = "⏸ Pause";
 
+    animationInterval = setInterval(() => {
         currentFhr++;
 
-        if(currentFhr > 60){
+        if(currentFhr > maxFhr){
             currentFhr = 1;
         }
 
         slider.value = currentFhr;
-
         updateImage();
 
-    },500);
-
+    },700);
 });
 
 modelSelect.addEventListener("change", loadRuns);
 productSelect.addEventListener("change", loadRuns);
 
-runSelect.addEventListener("change", updateImage);
-domainSelect.addEventListener("change", updateImage);
+runSelect.addEventListener("change", () => {
+    updateMaxFhr();
+    buildHourButtons();
+    updateImage();
+});
 
-buildHourButtons();
+domainSelect.addEventListener("change", updateImage);
 
 loadRuns();
 
