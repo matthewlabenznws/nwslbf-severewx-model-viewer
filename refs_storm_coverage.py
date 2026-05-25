@@ -402,13 +402,12 @@ def find_latest_available_refs_cycle(max_back_hours=48):
 
         dt = dt.replace(minute=0, second=0, microsecond=0, tzinfo=None)
 
-        for test_fhr in CYCLE_TEST_FHRS:
-            test_url = refs_grib_url(dt, test_fhr) + ".idx"
+        test_url = refs_grib_url(dt, 1) + ".idx"
 
-            if url_exists(test_url):
-                print(f"Latest {MODEL_LABEL} cycle found: {dt:%Y%m%d} {dt:%HZ}")
-                print("Matched IDX:", test_url)
-                return dt
+        if url_exists(test_url):
+            print(f"Latest {MODEL_LABEL} cycle found: {dt:%Y%m%d} {dt:%HZ}")
+            print("Matched IDX:", test_url)
+            return dt
 
     raise RuntimeError(f"Could not find recent {MODEL_LABEL} cycle.")
 
