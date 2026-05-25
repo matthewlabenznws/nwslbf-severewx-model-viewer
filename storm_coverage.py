@@ -825,7 +825,7 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
         init_title = f"Init: {init_dt:%a %Y-%m-%d %HZ} {MODEL_LABEL}"
 
         main_title = (
-            f"{MODEL_LABEL} | Fill: Lightning Probability > 0.2 | "
+            f"{MODEL_LABEL} | Fill: Lightning Probability | "
             "Black Contours: Composite Reflectivity > 40 dBZ Probability"
         )
 
