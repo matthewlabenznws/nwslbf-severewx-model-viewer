@@ -114,7 +114,7 @@
 
     .preview-wrap {
       width: 100%;
-      height: 210px;
+      height: 260px;
       overflow: hidden;
       background: #050505;
       border-bottom: 1px solid #333;
@@ -223,7 +223,7 @@
   <div class="status-item"><span class="live-dot">●</span>HRRR: <span id="hrrrRun">Loading...</span></div>
   <div class="status-item"><span class="live-dot">●</span>RRFS: <span id="rrfsRun">Loading...</span></div>
   <div class="status-item"><span class="live-dot">●</span>HREF: <span id="hrefRun">Loading...</span></div>
-  <div class="status-item"><span class="live-dot">●</span>REFS M01: <span id="refsRun">Loading...</span></div>
+  <div class="status-item"><span class="live-dot">●</span>REFS: <span id="refsRun">Loading...</span></div>
 </div>
 
 <div class="cards">
@@ -235,7 +235,6 @@
         class="preview"
         src=""
         alt="CAMs preview"
-        onerror="this.style.display='none';"
       >
     </div>
 
@@ -256,7 +255,6 @@
         class="preview"
         src=""
         alt="Meso-ensemble probability preview"
-        onerror="this.style.display='none';"
       >
     </div>
 
@@ -265,7 +263,6 @@
       <h2>MESO-ENS PROB</h2>
       <p>
         HREF and REFS severe weather probability guidance.
-    
       </p>
     </div>
   </a>
@@ -316,6 +313,32 @@ async function getLatestRun(path) {
   }
 }
 
+async function imageExists(url) {
+  try {
+    const response = await fetch(url, { method: "HEAD" });
+    return response.ok;
+  } catch (err) {
+    return false;
+  }
+}
+
+async function setFirstAvailablePreview(imgId, basePath, rid, domain, filePrefix, hours, pad) {
+  const img = document.getElementById(imgId);
+
+  for (const fhr of hours) {
+    const f = String(fhr).padStart(pad, "0");
+    const url = `${BASE_URL}${basePath}/${rid}/${domain}/${filePrefix}_f${f}.png?t=${Date.now()}`;
+
+    if (await imageExists(url)) {
+      img.style.display = "block";
+      img.src = url;
+      return;
+    }
+  }
+
+  img.style.display = "none";
+}
+
 async function updateHomepage() {
   const hrrr = await getLatestRun("/runs/cams/hrrr/refl_uh");
   const rrfs = await getLatestRun("/runs/cams/rrfs/refl_uh");
@@ -326,8 +349,17 @@ async function updateHomepage() {
     document.getElementById("hrrrRun").textContent = runLabel(hrrr);
 
     const rid = runId(hrrr);
-    document.getElementById("camsPreview").src =
-      `${BASE_URL}/runs/cams/hrrr/refl_uh/${rid}/regional/hrrr_lbf_f006.png?t=${Date.now()}`;
+
+    await setFirstAvailablePreview(
+      "camsPreview",
+      "/runs/cams/hrrr/refl_uh",
+      rid,
+      "regional",
+      "hrrr_lbf",
+      [12, 9, 6, 15, 18, 3, 0],
+      3
+    );
+
   } else {
     document.getElementById("hrrrRun").textContent = "Unavailable";
   }
@@ -342,10 +374,35 @@ async function updateHomepage() {
     document.getElementById("hrefRun").textContent = runLabel(href);
 
     const rid = runId(href);
-    document.getElementById("mesoPreview").src =
-      `${BASE_URL}/runs/mesoensprob/href/severe_prob/${rid}/regional/href_severe_prob_f12.png?t=${Date.now()}`;
+
+    await setFirstAvailablePreview(
+      "mesoPreview",
+      "/runs/mesoensprob/href/severe_prob",
+      rid,
+      "regional",
+      "href_severe_prob",
+      [12, 15, 18, 21, 24, 9, 6, 3, 1],
+      2
+    );
+
+  } else if (refs) {
+    document.getElementById("hrefRun").textContent = "Unavailable";
+
+    const rid = runId(refs);
+
+    await setFirstAvailablePreview(
+      "mesoPreview",
+      "/runs/mesoensprob/refs/severe_prob",
+      rid,
+      "regional",
+      "refs_severe_prob",
+      [12, 15, 18, 21, 24, 9, 6, 3, 1],
+      3
+    );
+
   } else {
     document.getElementById("hrefRun").textContent = "Unavailable";
+    document.getElementById("mesoPreview").style.display = "none";
   }
 
   if (refs) {
