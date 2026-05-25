@@ -446,24 +446,26 @@ function buildHourButtons(){
 
     hourButtons.innerHTML = "";
 
-    for(let i=1; i<=60; i++){
+    for(let i = 1; i <= maxFhr; i++){
 
         const btn = document.createElement("button");
 
         btn.className = "hour-btn";
-        btn.textContent = String(i).padStart(3,"0");
+
+        btn.textContent =
+            String(i).padStart(3,"0");
+
         btn.dataset.hour = i;
 
-        if(i > maxFhr){
-            btn.disabled = true;
-            btn.classList.add("disabled-hour");
-        } else {
-            btn.onclick = () => {
-                currentFhr = i;
-                slider.value = i;
-                updateImage();
-            };
-        }
+        btn.onclick = () => {
+
+            currentFhr = i;
+
+            slider.value = i;
+
+            updateImage();
+
+        };
 
         hourButtons.appendChild(btn);
     }
