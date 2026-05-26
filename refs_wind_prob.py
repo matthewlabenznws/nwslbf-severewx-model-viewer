@@ -188,7 +188,7 @@ add_spc_severe_domain()
 
 MODEL_LABEL = "REFS"
 
-VALID_CYCLES = [0, 6, 12, 18]
+VALID_REFS_CYCLES = [0, 6, 12, 18]
 
 START_FHR = 1
 MAX_FHR = 60
@@ -331,7 +331,7 @@ def find_latest_available_refs_cycle(max_back_hours=48):
 
         dt = dt.replace(minute=0, second=0, microsecond=0, tzinfo=None)
 
-        test_url = refs_grib_url(dt, 1) + ".idx"
+        test_url = grib_url(dt, 1) + ".idx"
 
         if url_exists(test_url):
             print(f"Latest {MODEL_LABEL} cycle found: {dt:%Y%m%d} {dt:%HZ}")
@@ -546,7 +546,7 @@ def upload_runs_json(init_dt, cycle_str, max_fhr):
 
     print("Uploaded runs.json with last 4 REFS runs.")
 
-init_dt = find_latest_cycle()
+init_dt = find_latest_available_refs_cycle()
 cycle_str = init_dt.strftime("%Y%m%d_%Hz")
 
 OUTDIR = os.path.join(OUTDIR_BASE, cycle_str)
