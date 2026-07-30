@@ -181,6 +181,61 @@
       line-height: 1.6;
     }
 
+
+    .save-controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      background: #151515;
+      border-bottom: 1px solid #2c2c2c;
+    }
+
+    .save-controls label {
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .gif-range {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 245px;
+    }
+
+    .gif-range input[type="range"] {
+      width: 150px;
+    }
+
+    .range-value {
+      min-width: 38px;
+      font-weight: bold;
+      color: #9ec0ff;
+    }
+
+    .loop-option {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+    }
+
+    #saveStatus {
+      min-width: 130px;
+      color: #aaa;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    button:disabled,
+    select:disabled,
+    input:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
     @media (max-width: 700px) {
       .navbar {
         font-size: 18px;
@@ -197,6 +252,19 @@
 
       .controls {
         grid-template-columns: 1fr;
+      }
+
+      .save-controls {
+        flex-direction: column;
+      }
+
+      .gif-range {
+        width: 100%;
+        justify-content: center;
+      }
+
+      #saveStatus {
+        text-align: center;
       }
     }
   </style>
@@ -263,6 +331,38 @@
   <div id="fhrLabel">000</div>
 </div>
 
+<div class="save-controls">
+  <button onclick="savePNG()" id="savePngBtn">Save PNG</button>
+
+  <label>GIF Start:</label>
+  <div class="gif-range">
+    <input id="gifStart" type="range" min="0" max="48" value="0">
+    <span class="range-value" id="gifStartLabel">F000</span>
+  </div>
+
+  <label>GIF End:</label>
+  <div class="gif-range">
+    <input id="gifEnd" type="range" min="0" max="48" value="48">
+    <span class="range-value" id="gifEndLabel">F048</span>
+  </div>
+
+  <label>Speed:</label>
+  <select id="gifDelay">
+    <option value="250">Fast</option>
+    <option value="450" selected>Normal</option>
+    <option value="700">Slow</option>
+  </select>
+
+  <label class="loop-option">
+    <input id="gifLoop" type="checkbox" checked>
+    Loop forever
+  </label>
+
+  <button onclick="saveGIF()" id="saveGifBtn">Save GIF</button>
+
+  <span id="saveStatus"></span>
+</div>
+
 <div class="tiles" id="tiles"></div>
 
 <div class="plot-wrap">
@@ -274,6 +374,7 @@
   NWS North Platte, Nebraska
 </div>
 
+<script src="assets/gif.js"></script>
 <script>
 const BASE_URL = "https://mtl-nwslbf-model-data.s3.us-east-2.amazonaws.com";
 
@@ -291,6 +392,7 @@ let availableFrames = [];
 let playing = false;
 let timer = null;
 let runs = [];
+let creatingGif = false;
 
 const modelSelect = document.getElementById("modelSelect");
 const memberSelect = document.getElementById("memberSelect");
@@ -304,9 +406,47 @@ const tiles = document.getElementById("tiles");
 const fhrLabel = document.getElementById("fhrLabel");
 const playBtn = document.getElementById("playBtn");
 const viewerTitle = document.getElementById("viewerTitle");
+const savePngBtn = document.getElementById("savePngBtn");
+const saveGifBtn = document.getElementById("saveGifBtn");
+const gifStart = document.getElementById("gifStart");
+const gifEnd = document.getElementById("gifEnd");
+const gifStartLabel = document.getElementById("gifStartLabel");
+const gifEndLabel = document.getElementById("gifEndLabel");
+const gifDelay = document.getElementById("gifDelay");
+const gifLoop = document.getElementById("gifLoop");
+const saveStatus = document.getElementById("saveStatus");
 
 modelSelect.value = selectedModel;
 memberSelect.value = selectedMember;
+
+function fhrText(fhr) {
+  return "F" + String(fhr).padStart(3, "0");
+}
+
+function updateGifRangeControls(resetRange = false) {
+  gifStart.max = maxFhr;
+  gifEnd.max = maxFhr;
+
+  if (resetRange) {
+    gifStart.value = 0;
+    gifEnd.value = maxFhr;
+  } else {
+    if (Number(gifStart.value) > maxFhr) {
+      gifStart.value = 0;
+    }
+
+    if (Number(gifEnd.value) > maxFhr) {
+      gifEnd.value = maxFhr;
+    }
+  }
+
+  if (Number(gifStart.value) > Number(gifEnd.value)) {
+    gifEnd.value = gifStart.value;
+  }
+
+  gifStartLabel.textContent = fhrText(gifStart.value);
+  gifEndLabel.textContent = fhrText(gifEnd.value);
+}
 
 function updateMemberVisibility() {
   memberBlock.style.display =
@@ -462,6 +602,7 @@ function updateMaxFhrForRun() {
   }
 
   slider.max = maxFhr;
+  updateGifRangeControls(false);
 }
 
 async function loadRunsJson() {
@@ -658,6 +799,294 @@ slider.addEventListener("input", () => {
   }
 });
 
+
+function buildDownloadName(extension, startFhr = null, endFhr = null) {
+  const memberPart =
+    selectedModel === "refs"
+      ? "_" + selectedMember
+      : "";
+
+  let name =
+    selectedModel +
+    memberPart +
+    "_" +
+    selectedProduct +
+    "_" +
+    selectedRun +
+    "_" +
+    selectedDomain;
+
+  if (startFhr !== null && endFhr !== null) {
+    name +=
+      "_f" +
+      String(startFhr).padStart(3, "0") +
+      "-f" +
+      String(endFhr).padStart(3, "0");
+  } else {
+    name += "_f" + String(current).padStart(3, "0");
+  }
+
+  return name + "." + extension;
+}
+
+function downloadBlob(blob, filename) {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = objectUrl;
+  link.download = filename;
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  setTimeout(() => {
+    URL.revokeObjectURL(objectUrl);
+  }, 1000);
+}
+
+async function savePNG() {
+  if (!selectedRun || !availableFrames.includes(current)) {
+    alert("No available frame is currently displayed.");
+    return;
+  }
+
+  savePngBtn.disabled = true;
+  saveStatus.textContent = "Saving PNG...";
+
+  try {
+    const response = await fetch(imgSrc(current));
+
+    if (!response.ok) {
+      throw new Error("PNG request failed");
+    }
+
+    const blob = await response.blob();
+
+    downloadBlob(
+      blob,
+      buildDownloadName("png")
+    );
+
+    saveStatus.textContent = "PNG saved";
+  } catch (err) {
+    console.error("Could not save PNG:", err);
+    saveStatus.textContent = "";
+    alert(
+      "The PNG could not be downloaded. Check the S3 bucket CORS settings."
+    );
+  } finally {
+    savePngBtn.disabled = false;
+
+    setTimeout(() => {
+      if (!creatingGif) {
+        saveStatus.textContent = "";
+      }
+    }, 2500);
+  }
+}
+
+async function loadGifImage(fhr) {
+  const response = await fetch(imgSrc(fhr));
+
+  if (!response.ok) {
+    throw new Error("Frame request failed");
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = objectUrl;
+    });
+
+    return image;
+  } finally {
+    setTimeout(() => {
+      URL.revokeObjectURL(objectUrl);
+    }, 1000);
+  }
+}
+
+async function saveGIF() {
+  if (creatingGif) {
+    return;
+  }
+
+  if (typeof GIF === "undefined") {
+    alert(
+      "gif.js did not load. Make sure assets/gif.js exists."
+    );
+    return;
+  }
+
+  let startHour = Number(gifStart.value);
+  let endHour = Number(gifEnd.value);
+
+  if (startHour > endHour) {
+    const temp = startHour;
+    startHour = endHour;
+    endHour = temp;
+
+    gifStart.value = startHour;
+    gifEnd.value = endHour;
+    updateGifRangeControls(false);
+  }
+
+  const selectedFrames =
+    availableFrames.filter(
+      fhr => fhr >= startHour && fhr <= endHour
+    );
+
+  if (selectedFrames.length === 0) {
+    alert(
+      "No available frames were found in the selected GIF range."
+    );
+    return;
+  }
+
+  creatingGif = true;
+  saveGifBtn.disabled = true;
+  savePngBtn.disabled = true;
+  gifStart.disabled = true;
+  gifEnd.disabled = true;
+  gifDelay.disabled = true;
+  gifLoop.disabled = true;
+
+  const delay = Number(gifDelay.value);
+
+  const gif = new GIF({
+    workers: 2,
+    quality: 10,
+    repeat: gifLoop.checked ? 0 : -1,
+    workerScript: "assets/gif.worker.js"
+  });
+
+  let framesAdded = 0;
+
+  try {
+    for (let i = 0; i < selectedFrames.length; i++) {
+      const fhr = selectedFrames[i];
+
+      saveGifBtn.textContent =
+        "Loading " +
+        (i + 1) +
+        "/" +
+        selectedFrames.length;
+
+      saveStatus.textContent =
+        "Loading " + fhrText(fhr);
+
+      try {
+        const image = await loadGifImage(fhr);
+
+        gif.addFrame(image, {
+          copy: true,
+          delay:
+            i === selectedFrames.length - 1
+              ? Math.max(delay, 1000)
+              : delay
+        });
+
+        framesAdded++;
+      } catch (err) {
+        console.warn(
+          "Skipping unavailable frame " +
+          fhrText(fhr),
+          err
+        );
+      }
+    }
+
+    if (framesAdded === 0) {
+      throw new Error("No frames could be loaded");
+    }
+
+    saveGifBtn.textContent = "Creating...";
+    saveStatus.textContent =
+      "Rendering " +
+      framesAdded +
+      " frame" +
+      (framesAdded === 1 ? "" : "s");
+
+    gif.on("progress", progress => {
+      saveStatus.textContent =
+        "Rendering " +
+        Math.round(progress * 100) +
+        "%";
+    });
+
+    gif.on("finished", blob => {
+      downloadBlob(
+        blob,
+        buildDownloadName(
+          "gif",
+          startHour,
+          endHour
+        )
+      );
+
+      creatingGif = false;
+      saveGifBtn.disabled = false;
+      savePngBtn.disabled = false;
+      gifStart.disabled = false;
+      gifEnd.disabled = false;
+      gifDelay.disabled = false;
+      gifLoop.disabled = false;
+      saveGifBtn.textContent = "Save GIF";
+      saveStatus.textContent = "GIF saved";
+
+      setTimeout(() => {
+        saveStatus.textContent = "";
+      }, 2500);
+    });
+
+    gif.on("abort", () => {
+      throw new Error("GIF rendering stopped");
+    });
+
+    gif.render();
+
+  } catch (err) {
+    console.error("Could not create GIF:", err);
+
+    creatingGif = false;
+    saveGifBtn.disabled = false;
+    savePngBtn.disabled = false;
+    gifStart.disabled = false;
+    gifEnd.disabled = false;
+    gifDelay.disabled = false;
+    gifLoop.disabled = false;
+    saveGifBtn.textContent = "Save GIF";
+    saveStatus.textContent = "";
+
+    alert(
+      "The GIF could not be created. Check that assets/gif.worker.js exists and that the S3 bucket allows CORS GET requests."
+    );
+  }
+}
+
+gifStart.addEventListener("input", () => {
+  if (Number(gifStart.value) > Number(gifEnd.value)) {
+    gifEnd.value = gifStart.value;
+  }
+
+  updateGifRangeControls(false);
+});
+
+gifEnd.addEventListener("input", () => {
+  if (Number(gifEnd.value) < Number(gifStart.value)) {
+    gifStart.value = gifEnd.value;
+  }
+
+  updateGifRangeControls(false);
+});
+
 function togglePlay() {
 
   playing = !playing;
@@ -718,6 +1147,8 @@ async function latestRun() {
   selectedRun = "";
 
   await refreshViewer();
+
+  updateGifRangeControls(true);
 
   setFrame(firstAvailableFrame());
 }
@@ -820,7 +1251,9 @@ async function init() {
 
   setInterval(async () => {
 
-    await refreshViewer();
+    if (!creatingGif) {
+      await refreshViewer();
+    }
 
   }, 30000);
 }
