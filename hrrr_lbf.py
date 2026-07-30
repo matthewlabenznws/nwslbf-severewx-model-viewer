@@ -12,6 +12,7 @@ import os
 import glob
 import json
 import zipfile
+import time
 import requests
 import boto3
 import numpy as np
@@ -1031,13 +1032,78 @@ def plot_domain_from_fields(fields, domain_key, cfg, fhr):
 # MAIN LOOP
 # ============================================================
 
+MAX_FHR_ATTEMPTS = 3
+RETRY_WAIT_SECONDS = 20
+
+successful_fhrs = []
+failed_fhrs = []
+
 for fhr in fhrs:
-    try:
-        fields = load_hrrr_fields_once(fhr)
 
-        for domain_key, cfg in DOMAINS.items():
-            plot_domain_from_fields(fields, domain_key, cfg, fhr)
+    fhr_success = False
 
-    except Exception as e:
-        print(f"Skipping F{fhr:03d} due to error: {e}")
-        continue
+    for attempt in range(1, MAX_FHR_ATTEMPTS + 1):
+
+        try:
+            print("\n" + "=" * 70)
+            print(
+                f"Processing HRRR F{fhr:03d} | "
+                f"Attempt {attempt}/{MAX_FHR_ATTEMPTS}"
+            )
+            print("=" * 70)
+
+            fields = load_hrrr_fields_once(fhr)
+
+            for domain_key, cfg in DOMAINS.items():
+                plot_domain_from_fields(
+                    fields,
+                    domain_key,
+                    cfg,
+                    fhr
+                )
+
+            fhr_success = True
+            successful_fhrs.append(fhr)
+
+            print(
+                f"Successfully completed HRRR F{fhr:03d}"
+            )
+
+            break
+
+        except Exception as e:
+            print(
+                f"HRRR F{fhr:03d} failed on attempt "
+                f"{attempt}/{MAX_FHR_ATTEMPTS}: {e}"
+            )
+
+            if attempt < MAX_FHR_ATTEMPTS:
+                print(
+                    f"Waiting {RETRY_WAIT_SECONDS} seconds "
+                    f"before retrying F{fhr:03d}..."
+                )
+
+                time.sleep(RETRY_WAIT_SECONDS)
+
+    if not fhr_success:
+        failed_fhrs.append(fhr)
+
+        print(
+            f"Skipping HRRR F{fhr:03d} after "
+            f"{MAX_FHR_ATTEMPTS} failed attempts."
+        )
+
+
+print("\n" + "=" * 70)
+print("HRRR PROCESSING SUMMARY")
+print("=" * 70)
+
+print(
+    "Successful forecast hours:",
+    [f"F{fhr:03d}" for fhr in successful_fhrs]
+)
+
+print(
+    "Failed forecast hours:",
+    [f"F{fhr:03d}" for fhr in failed_fhrs]
+)
