@@ -359,7 +359,6 @@
   </label>
 
   <button onclick="saveGIF()" id="saveGifBtn">Save GIF</button>
-
   <span id="saveStatus"></span>
 </div>
 
@@ -419,33 +418,32 @@ const saveStatus = document.getElementById("saveStatus");
 modelSelect.value = selectedModel;
 memberSelect.value = selectedMember;
 
-function fhrText(fhr) {
-  return "F" + String(fhr).padStart(3, "0");
+function formatFhr(fhr) {
+  return "F" + String(Number(fhr)).padStart(3, "0");
 }
 
-function updateGifRangeControls(resetRange = false) {
+function resetGifRange() {
+  gifStart.min = 0;
+  gifEnd.min = 0;
   gifStart.max = maxFhr;
   gifEnd.max = maxFhr;
+  gifStart.value = 0;
+  gifEnd.value = maxFhr;
+  gifStartLabel.textContent = formatFhr(0);
+  gifEndLabel.textContent = formatFhr(maxFhr);
+}
 
-  if (resetRange) {
-    gifStart.value = 0;
-    gifEnd.value = maxFhr;
-  } else {
-    if (Number(gifStart.value) > maxFhr) {
-      gifStart.value = 0;
-    }
+function syncGifRangeLabels() {
+  let start = Number(gifStart.value);
+  let end = Number(gifEnd.value);
 
-    if (Number(gifEnd.value) > maxFhr) {
-      gifEnd.value = maxFhr;
-    }
+  if (start > end) {
+    end = start;
+    gifEnd.value = end;
   }
 
-  if (Number(gifStart.value) > Number(gifEnd.value)) {
-    gifEnd.value = gifStart.value;
-  }
-
-  gifStartLabel.textContent = fhrText(gifStart.value);
-  gifEndLabel.textContent = fhrText(gifEnd.value);
+  gifStartLabel.textContent = formatFhr(start);
+  gifEndLabel.textContent = formatFhr(end);
 }
 
 function updateMemberVisibility() {
@@ -602,7 +600,6 @@ function updateMaxFhrForRun() {
   }
 
   slider.max = maxFhr;
-  updateGifRangeControls(false);
 }
 
 async function loadRunsJson() {
@@ -806,7 +803,7 @@ function buildDownloadName(extension, startFhr = null, endFhr = null) {
       ? "_" + selectedMember
       : "";
 
-  let name =
+  let filename =
     selectedModel +
     memberPart +
     "_" +
@@ -817,16 +814,18 @@ function buildDownloadName(extension, startFhr = null, endFhr = null) {
     selectedDomain;
 
   if (startFhr !== null && endFhr !== null) {
-    name +=
+    filename +=
       "_f" +
       String(startFhr).padStart(3, "0") +
       "-f" +
       String(endFhr).padStart(3, "0");
   } else {
-    name += "_f" + String(current).padStart(3, "0");
+    filename +=
+      "_f" +
+      String(current).padStart(3, "0");
   }
 
-  return name + "." + extension;
+  return filename + "." + extension;
 }
 
 function downloadBlob(blob, filename) {
@@ -873,7 +872,7 @@ async function savePNG() {
     console.error("Could not save PNG:", err);
     saveStatus.textContent = "";
     alert(
-      "The PNG could not be downloaded. Check the S3 bucket CORS settings."
+      "The PNG could not be downloaded. Check the AWS bucket CORS settings."
     );
   } finally {
     savePngBtn.disabled = false;
@@ -897,20 +896,27 @@ async function loadGifImage(fhr) {
   const objectUrl = URL.createObjectURL(blob);
 
   try {
-    const image = await new Promise((resolve, reject) => {
-      const img = new Image();
+    return await new Promise((resolve, reject) => {
+      const image = new Image();
 
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = objectUrl;
+      image.onload = () => resolve(image);
+      image.onerror = reject;
+      image.src = objectUrl;
     });
-
-    return image;
   } finally {
     setTimeout(() => {
       URL.revokeObjectURL(objectUrl);
     }, 1000);
   }
+}
+
+function setGifControlsDisabled(disabled) {
+  saveGifBtn.disabled = disabled;
+  savePngBtn.disabled = disabled;
+  gifStart.disabled = disabled;
+  gifEnd.disabled = disabled;
+  gifDelay.disabled = disabled;
+  gifLoop.disabled = disabled;
 }
 
 async function saveGIF() {
@@ -920,28 +926,21 @@ async function saveGIF() {
 
   if (typeof GIF === "undefined") {
     alert(
-      "gif.js did not load. Make sure assets/gif.js exists."
+      "gif.js did not load. Make sure assets/gif.js contains the actual library code."
     );
     return;
   }
 
-  let startHour = Number(gifStart.value);
-  let endHour = Number(gifEnd.value);
+  const startHour = Number(gifStart.value);
+  const endHour = Number(gifEnd.value);
 
-  if (startHour > endHour) {
-    const temp = startHour;
-    startHour = endHour;
-    endHour = temp;
-
-    gifStart.value = startHour;
-    gifEnd.value = endHour;
-    updateGifRangeControls(false);
-  }
-
-  const selectedFrames =
-    availableFrames.filter(
-      fhr => fhr >= startHour && fhr <= endHour
-    );
+  /*
+   * Use only frames the original viewer already found.
+   * This does not alter or skip any additional forecast hours.
+   */
+  const selectedFrames = availableFrames.filter(
+    fhr => fhr >= startHour && fhr <= endHour
+  );
 
   if (selectedFrames.length === 0) {
     alert(
@@ -951,12 +950,7 @@ async function saveGIF() {
   }
 
   creatingGif = true;
-  saveGifBtn.disabled = true;
-  savePngBtn.disabled = true;
-  gifStart.disabled = true;
-  gifEnd.disabled = true;
-  gifDelay.disabled = true;
-  gifLoop.disabled = true;
+  setGifControlsDisabled(true);
 
   const delay = Number(gifDelay.value);
 
@@ -980,7 +974,8 @@ async function saveGIF() {
         selectedFrames.length;
 
       saveStatus.textContent =
-        "Loading " + fhrText(fhr);
+        "Loading " +
+        formatFhr(fhr);
 
       try {
         const image = await loadGifImage(fhr);
@@ -996,8 +991,8 @@ async function saveGIF() {
         framesAdded++;
       } catch (err) {
         console.warn(
-          "Skipping unavailable frame " +
-          fhrText(fhr),
+          "Could not load " +
+          formatFhr(fhr),
           err
         );
       }
@@ -1032,12 +1027,7 @@ async function saveGIF() {
       );
 
       creatingGif = false;
-      saveGifBtn.disabled = false;
-      savePngBtn.disabled = false;
-      gifStart.disabled = false;
-      gifEnd.disabled = false;
-      gifDelay.disabled = false;
-      gifLoop.disabled = false;
+      setGifControlsDisabled(false);
       saveGifBtn.textContent = "Save GIF";
       saveStatus.textContent = "GIF saved";
 
@@ -1046,27 +1036,17 @@ async function saveGIF() {
       }, 2500);
     });
 
-    gif.on("abort", () => {
-      throw new Error("GIF rendering stopped");
-    });
-
     gif.render();
-
   } catch (err) {
     console.error("Could not create GIF:", err);
 
     creatingGif = false;
-    saveGifBtn.disabled = false;
-    savePngBtn.disabled = false;
-    gifStart.disabled = false;
-    gifEnd.disabled = false;
-    gifDelay.disabled = false;
-    gifLoop.disabled = false;
+    setGifControlsDisabled(false);
     saveGifBtn.textContent = "Save GIF";
     saveStatus.textContent = "";
 
     alert(
-      "The GIF could not be created. Check that assets/gif.worker.js exists and that the S3 bucket allows CORS GET requests."
+      "The GIF could not be created. Confirm that gif.js and gif.worker.js contain the actual library code and that AWS permits CORS GET requests."
     );
   }
 }
@@ -1076,7 +1056,7 @@ gifStart.addEventListener("input", () => {
     gifEnd.value = gifStart.value;
   }
 
-  updateGifRangeControls(false);
+  syncGifRangeLabels();
 });
 
 gifEnd.addEventListener("input", () => {
@@ -1084,7 +1064,7 @@ gifEnd.addEventListener("input", () => {
     gifStart.value = gifEnd.value;
   }
 
-  updateGifRangeControls(false);
+  syncGifRangeLabels();
 });
 
 function togglePlay() {
@@ -1129,6 +1109,8 @@ async function refreshViewer() {
 
   await refreshHourAvailability();
 
+  resetGifRange();
+
   if (
     current > maxFhr ||
     !availableFrames.includes(current)
@@ -1148,7 +1130,7 @@ async function latestRun() {
 
   await refreshViewer();
 
-  updateGifRangeControls(true);
+  resetGifRange();
 
   setFrame(firstAvailableFrame());
 }
@@ -1175,6 +1157,8 @@ async function changeModel() {
   updateTitle();
 
   await refreshViewer();
+
+  resetGifRange();
 }
 
 async function changeMember() {
@@ -1186,6 +1170,8 @@ async function changeMember() {
   updateTitle();
 
   await refreshViewer();
+
+  resetGifRange();
 }
 
 async function changeProduct() {
@@ -1198,6 +1184,8 @@ async function changeProduct() {
   updateTitle();
 
   await refreshViewer();
+
+  resetGifRange();
 }
 
 async function changeRun() {
@@ -1246,6 +1234,8 @@ async function init() {
   updateTitle();
 
   await refreshViewer();
+
+  resetGifRange();
 
   setFrame(firstAvailableFrame());
 
