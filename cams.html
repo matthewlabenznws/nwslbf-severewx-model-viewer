@@ -90,10 +90,16 @@
     }
 
     #memberBlock,
-    #rightProductBlock {
+    #rightProductBlock,
+    #rightModelBlock,
+    #rightMemberBlock {
       display: none;
       align-items: center;
       gap: 7px;
+    }
+
+    #rightProductBlock {
+      flex-wrap: wrap;
     }
 
     #viewerTitle {
@@ -331,10 +337,11 @@
   <label>View:</label>
   <select id="viewSelect" onchange="changeView()">
     <option value="single">Single Panel</option>
-    <option value="compare">Compare Products</option>
+    <option value="compare_products">Compare Products</option>
+    <option value="compare_models">Compare Models</option>
   </select>
 
-  <label>Model:</label>
+  <label id="leftModelLabel">Model:</label>
   <select id="modelSelect" onchange="changeModel()">
     <option value="hrrr">HRRR</option>
     <option value="rrfs">RRFS</option>
@@ -356,6 +363,26 @@
   <select id="leftProductSelect" onchange="changeLeftProduct()"></select>
 
   <span id="rightProductBlock">
+    <span id="rightModelBlock">
+      <label>Right Model:</label>
+      <select id="rightModelSelect" onchange="changeRightModel()">
+        <option value="hrrr">HRRR</option>
+        <option value="rrfs">RRFS</option>
+        <option value="refs">REFS</option>
+      </select>
+    </span>
+
+    <span id="rightMemberBlock">
+      <label>Member:</label>
+      <select id="rightMemberSelect" onchange="changeRightMember()">
+        <option value="m01">M01</option>
+        <option value="m02">M02</option>
+        <option value="m03">M03</option>
+        <option value="m04">M04</option>
+        <option value="m05">M05</option>
+      </select>
+    </span>
+
     <label>Right Product:</label>
     <select id="rightProductSelect" onchange="changeRightProduct()"></select>
   </span>
@@ -432,15 +459,15 @@
 <script src="assets/gif.js"></script>
 <script>
 const BASE_URL = "https://mtl-nwslbf-model-data.s3.us-east-2.amazonaws.com";
-
 const params = new URLSearchParams(window.location.search);
 
 let selectedView = params.get("view") || "single";
 let selectedModel = params.get("model") || "hrrr";
 let selectedMember = params.get("member") || "m01";
 let leftProduct = params.get("product") || "refl_uh";
-let rightProduct = params.get("rightProduct") || "max_uh_02";
-
+let rightModel = params.get("rightModel") || "rrfs";
+let rightMember = params.get("rightMember") || "m01";
+let rightProduct = params.get("rightProduct") || "refl_uh";
 let selectedRun = "";
 let selectedDomain = "regional";
 let current = 0;
@@ -449,6 +476,8 @@ let availableFrames = [];
 let playing = false;
 let timer = null;
 let runs = [];
+let leftRuns = [];
+let rightRuns = [];
 let creatingGif = false;
 
 const viewSelect = document.getElementById("viewSelect");
@@ -458,6 +487,11 @@ const memberBlock = document.getElementById("memberBlock");
 const leftProductSelect = document.getElementById("leftProductSelect");
 const rightProductSelect = document.getElementById("rightProductSelect");
 const rightProductBlock = document.getElementById("rightProductBlock");
+const rightModelBlock = document.getElementById("rightModelBlock");
+const rightModelSelect = document.getElementById("rightModelSelect");
+const rightMemberBlock = document.getElementById("rightMemberBlock");
+const rightMemberSelect = document.getElementById("rightMemberSelect");
+const leftModelLabel = document.getElementById("leftModelLabel");
 const leftProductLabel = document.getElementById("leftProductLabel");
 const runSelect = document.getElementById("runSelect");
 const domainSelect = document.getElementById("domainSelect");
@@ -485,59 +519,62 @@ const saveStatus = document.getElementById("saveStatus");
 viewSelect.value = selectedView;
 modelSelect.value = selectedModel;
 memberSelect.value = selectedMember;
+rightModelSelect.value = rightModel;
+rightMemberSelect.value = rightMember;
 
-function formatFhr(fhr) {
-  return "F" + String(Number(fhr)).padStart(3, "0");
+function isCompare() { return selectedView !== "single"; }
+function formatFhr(f) { return "F" + String(Number(f)).padStart(3, "0"); }
+function runId(run) { return typeof run === "string" ? run : run.id; }
+function runLabel(run) { return typeof run === "string" ? run.replace("_", " ") : (run.label || run.id); }
+
+function modelLabel(model, member) {
+  return model === "refs" ? "REFS " + member.toUpperCase() : model.toUpperCase();
 }
 
-function productOptionsForModel() {
-  if (selectedModel === "hrrr") {
+function productOptionsForModel(model) {
+  if (model === "hrrr") {
     return [
       ["refl_uh", "Reflectivity/UH"],
       ["hail_swath", "Hail Swath"],
       ["max_uh_02", "Max 0-2 km UH"]
     ];
   }
-
   return [
     ["refl_uh", "Reflectivity/UH"],
     ["hail_swath", "Hail Swath"]
   ];
 }
 
-function productLabel(product) {
-  const match = productOptionsForModel().find(item => item[0] === product);
+function productLabel(model, product) {
+  const match = productOptionsForModel(model).find(x => x[0] === product);
   return match ? match[1] : product;
 }
 
-function populateProductSelect(select, selectedValue) {
+function populateProductSelect(select, model, value) {
   select.innerHTML = "";
-
-  const options = productOptionsForModel();
-
-  options.forEach(([value, label]) => {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = label;
-    select.appendChild(option);
+  const options = productOptionsForModel(model);
+  options.forEach(([v, label]) => {
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = label;
+    select.appendChild(opt);
   });
-
-  const values = options.map(item => item[0]);
-
-  if (!values.includes(selectedValue)) {
-    selectedValue = values[0];
-  }
-
-  select.value = selectedValue;
-  return selectedValue;
+  const values = options.map(x => x[0]);
+  if (!values.includes(value)) value = values[0];
+  select.value = value;
+  return value;
 }
 
 function updateProductOptions() {
-  leftProduct = populateProductSelect(leftProductSelect, leftProduct);
-  rightProduct = populateProductSelect(rightProductSelect, rightProduct);
+  leftProduct = populateProductSelect(leftProductSelect, selectedModel, leftProduct);
+  if (selectedView === "compare_products") {
+    rightModel = selectedModel;
+    rightMember = selectedMember;
+  }
+  rightProduct = populateProductSelect(rightProductSelect, rightModel, rightProduct);
 
-  if (selectedView === "compare" && rightProduct === leftProduct) {
-    const other = productOptionsForModel().find(item => item[0] !== leftProduct);
+  if (selectedView === "compare_products" && rightProduct === leftProduct) {
+    const other = productOptionsForModel(selectedModel).find(x => x[0] !== leftProduct);
     if (other) {
       rightProduct = other[0];
       rightProductSelect.value = rightProduct;
@@ -545,116 +582,79 @@ function updateProductOptions() {
   }
 }
 
-function updateMemberVisibility() {
-  memberBlock.style.display =
-    selectedModel === "refs" ? "inline-flex" : "none";
-}
-
-function updateViewVisibility() {
-  const compare = selectedView === "compare";
-
+function updateVisibility() {
+  memberBlock.style.display = selectedModel === "refs" ? "inline-flex" : "none";
+  const compare = isCompare();
   rightProductBlock.style.display = compare ? "inline-flex" : "none";
   rightPanel.style.display = compare ? "block" : "none";
   plotWrap.classList.toggle("compare", compare);
-  leftProductLabel.textContent = compare ? "Left Product:" : "Product:";
+
+  if (selectedView === "compare_models") {
+    rightModelBlock.style.display = "inline-flex";
+    rightMemberBlock.style.display = rightModel === "refs" ? "inline-flex" : "none";
+    leftModelLabel.textContent = "Left Model:";
+    leftProductLabel.textContent = "Left Product:";
+  } else if (selectedView === "compare_products") {
+    rightModelBlock.style.display = "none";
+    rightMemberBlock.style.display = "none";
+    leftModelLabel.textContent = "Model:";
+    leftProductLabel.textContent = "Left Product:";
+  } else {
+    rightModelBlock.style.display = "none";
+    rightMemberBlock.style.display = "none";
+    leftModelLabel.textContent = "Model:";
+    leftProductLabel.textContent = "Product:";
+  }
   savePngBtn.textContent = compare ? "Save Two-Panel PNG" : "Save PNG";
 }
 
 function updateTitle() {
-  let modelLabel = selectedModel.toUpperCase();
-
-  if (selectedModel === "refs") {
-    modelLabel = "REFS " + selectedMember.toUpperCase();
-  }
-
-  if (selectedView === "compare") {
-    viewerTitle.textContent =
-      `${modelLabel} Product Comparison`;
-
-    leftPanelTitle.textContent = productLabel(leftProduct);
-    rightPanelTitle.textContent = productLabel(rightProduct);
-  } else {
-    viewerTitle.textContent =
-      `${modelLabel} ${productLabel(leftProduct)}`;
-
+  const lm = modelLabel(selectedModel, selectedMember);
+  const rm = modelLabel(rightModel, rightMember);
+  if (selectedView === "single") {
+    viewerTitle.textContent = `${lm} ${productLabel(selectedModel, leftProduct)}`;
     leftPanelTitle.textContent = "";
     rightPanelTitle.textContent = "";
+  } else if (selectedView === "compare_products") {
+    viewerTitle.textContent = `${lm} Product Comparison`;
+    leftPanelTitle.textContent = productLabel(selectedModel, leftProduct);
+    rightPanelTitle.textContent = productLabel(rightModel, rightProduct);
+  } else {
+    viewerTitle.textContent = `${lm} vs ${rm}`;
+    leftPanelTitle.textContent = `${lm} ${productLabel(selectedModel, leftProduct)}`;
+    rightPanelTitle.textContent = `${rm} ${productLabel(rightModel, rightProduct)}`;
   }
 }
 
-function getProductPath(product) {
-  if (selectedModel === "refs") {
-    return `/runs/cams/refs/${selectedMember}/${product}`;
-  }
-
-  return `/runs/cams/${selectedModel}/${product}`;
+function getProductPath(model, member, product) {
+  if (model === "refs") return `/runs/cams/refs/${member}/${product}`;
+  return `/runs/cams/${model}/${product}`;
 }
 
-function getFileName(product, fhr) {
+function getFileName(model, member, product, fhr) {
   const f = String(fhr).padStart(3, "0");
-
-  if (selectedModel === "refs") {
-    if (product === "hail_swath") {
-      return `refs_${selectedMember}_hail_swath_f${f}.png`;
-    }
-
-    return `refs_${selectedMember}_lbf_f${f}.png`;
+  if (model === "refs") {
+    if (product === "hail_swath") return `refs_${member}_hail_swath_f${f}.png`;
+    return `refs_${member}_lbf_f${f}.png`;
   }
-
-  if (product === "hail_swath") {
-    return `${selectedModel}_hail_swath_f${f}.png`;
-  }
-
-  if (product === "max_uh_02") {
-    return `${selectedModel}_max_uh_02_f${f}.png`;
-  }
-
-  return `${selectedModel}_lbf_f${f}.png`;
+  if (product === "hail_swath") return `${model}_hail_swath_f${f}.png`;
+  if (product === "max_uh_02") return `${model}_max_uh_02_f${f}.png`;
+  return `${model}_lbf_f${f}.png`;
 }
 
-function imgSrc(product, fhr) {
+function panelImgSrc(model, member, product, fhr) {
   if (!selectedRun) return "";
-
-  return (
-    BASE_URL +
-    getProductPath(product) +
-    "/" +
-    selectedRun +
-    "/" +
-    selectedDomain +
-    "/" +
-    getFileName(product, fhr) +
-    "?t=" +
-    Date.now()
-  );
+  return BASE_URL + getProductPath(model, member, product) + "/" + selectedRun + "/" + selectedDomain + "/" + getFileName(model, member, product, fhr) + "?t=" + Date.now();
 }
 
-function runId(run) {
-  return typeof run === "string" ? run : run.id;
-}
+function leftImgSrc(fhr) { return panelImgSrc(selectedModel, selectedMember, leftProduct, fhr); }
+function rightImgSrc(fhr) { return panelImgSrc(rightModel, rightMember, rightProduct, fhr); }
 
-function runLabel(run) {
-  if (typeof run === "string") {
-    return run.replace("_", " ");
-  }
-
-  return run.label || run.id;
-}
-
-async function fetchRunsForProduct(product) {
-  const url =
-    BASE_URL +
-    getProductPath(product) +
-    "/runs.json?t=" +
-    Date.now();
-
+async function fetchRuns(model, member, product) {
+  const url = BASE_URL + getProductPath(model, member, product) + "/runs.json?t=" + Date.now();
   try {
     const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     return data.runs || [];
   } catch (err) {
@@ -664,129 +664,99 @@ async function fetchRunsForProduct(product) {
 }
 
 async function loadRunsJson() {
-  const leftRuns = await fetchRunsForProduct(leftProduct);
-
-  if (selectedView === "single") {
+  leftRuns = await fetchRuns(selectedModel, selectedMember, leftProduct);
+  if (!isCompare()) {
+    rightRuns = [];
     runs = leftRuns;
   } else {
-    const rightRuns = await fetchRunsForProduct(rightProduct);
+    rightRuns = await fetchRuns(rightModel, rightMember, rightProduct);
     const rightIds = new Set(rightRuns.map(runId));
-
-    runs = leftRuns.filter(run => rightIds.has(runId(run)));
+    runs = leftRuns.filter(r => rightIds.has(runId(r)));
   }
-
-  if (runs.length > 0) {
+  if (runs.length) {
     const ids = runs.map(runId);
-
-    if (!ids.includes(selectedRun)) {
-      selectedRun = ids[0];
-    }
-  } else {
-    selectedRun = "";
-  }
+    if (!ids.includes(selectedRun)) selectedRun = ids[0];
+  } else selectedRun = "";
 }
 
 function populateRunDropdown() {
   runSelect.innerHTML = "";
-
   runs.forEach(run => {
-    const option = document.createElement("option");
-    option.value = runId(run);
-    option.textContent = runLabel(run);
-    runSelect.appendChild(option);
+    const opt = document.createElement("option");
+    opt.value = runId(run);
+    opt.textContent = runLabel(run);
+    runSelect.appendChild(opt);
   });
-
   runSelect.value = selectedRun;
 }
 
-function runMaxFhr(run) {
-  if (
-    run &&
-    typeof run !== "string" &&
-    run.max_fhr !== undefined
-  ) {
-    return Number(run.max_fhr);
-  }
+function fallbackMaxFhr(model, runText) {
+  const hour = Number(((runText || "").split("_")[1] || "").replace("z", ""));
+  if (model === "hrrr") return [0,6,12,18].includes(hour) ? 48 : 18;
+  if (model === "rrfs") return [0,6,12,18].includes(hour) ? 60 : 18;
+  if (model === "refs") return 60;
+  return 18;
+}
 
-  const id = runId(run || selectedRun);
-  const hourText = (id.split("_")[1] || "").replace("z", "");
-  const hour = Number(hourText);
-
-  return [0, 6, 12, 18].includes(hour) ? 48 : 18;
+function runMax(run, model) {
+  if (run && typeof run !== "string" && run.max_fhr !== undefined) return Number(run.max_fhr);
+  return fallbackMaxFhr(model, run ? runId(run) : selectedRun);
 }
 
 function updateMaxFhrForRun() {
-  const runObject = runs.find(run => runId(run) === selectedRun);
-  maxFhr = runMaxFhr(runObject);
+  const leftRun = leftRuns.find(r => runId(r) === selectedRun);
+  const leftMax = runMax(leftRun, selectedModel);
+  if (!isCompare()) maxFhr = leftMax;
+  else {
+    const rightRun = rightRuns.find(r => runId(r) === selectedRun);
+    const rightMax = runMax(rightRun, rightModel);
+    maxFhr = Math.min(leftMax, rightMax);
+  }
   slider.max = maxFhr;
 }
 
 function resetGifRange() {
-  gifStart.min = 0;
-  gifEnd.min = 0;
-  gifStart.max = maxFhr;
-  gifEnd.max = maxFhr;
-  gifStart.value = 0;
-  gifEnd.value = maxFhr;
+  gifStart.min = 0; gifEnd.min = 0;
+  gifStart.max = maxFhr; gifEnd.max = maxFhr;
+  gifStart.value = 0; gifEnd.value = maxFhr;
   gifStartLabel.textContent = formatFhr(0);
   gifEndLabel.textContent = formatFhr(maxFhr);
 }
 
 function syncGifRangeLabels() {
-  let start = Number(gifStart.value);
-  let end = Number(gifEnd.value);
-
-  if (start > end) {
-    end = start;
-    gifEnd.value = end;
-  }
-
-  gifStartLabel.textContent = formatFhr(start);
-  gifEndLabel.textContent = formatFhr(end);
+  let a = Number(gifStart.value), b = Number(gifEnd.value);
+  if (a > b) { b = a; gifEnd.value = b; }
+  gifStartLabel.textContent = formatFhr(a);
+  gifEndLabel.textContent = formatFhr(b);
 }
 
-async function frameExists(product, fhr) {
+async function frameExists(url) {
   try {
-    const response = await fetch(imgSrc(product, fhr), {
-      method: "HEAD"
-    });
-
+    const response = await fetch(url, { method: "HEAD" });
     return response.ok;
-  } catch (err) {
-    return false;
-  }
+  } catch (err) { return false; }
 }
 
 async function refreshHourAvailability() {
   availableFrames = [];
   updateMaxFhrForRun();
-
   if (tiles.children.length !== maxFhr + 1) {
     tiles.innerHTML = "";
-
     for (let f = 0; f <= maxFhr; f++) {
       const button = document.createElement("button");
-
       button.className = "frame missing";
       button.textContent = String(f).padStart(3, "0");
       button.disabled = true;
       button.dataset.fhr = f;
       button.onclick = () => setFrame(f);
-
       tiles.appendChild(button);
     }
   }
-
   for (let f = 0; f <= maxFhr; f++) {
     const button = tiles.children[f];
-
-    const leftAvailable = await frameExists(leftProduct, f);
-    const rightAvailable =
-      selectedView === "compare"
-        ? await frameExists(rightProduct, f)
-        : true;
-
-    if (leftAvailable && rightAvailable) {
+    const leftOK = await frameExists(leftImgSrc(f));
+    const rightOK = isCompare() ? await frameExists(rightImgSrc(f)) : true;
+    if (leftOK && rightOK) {
       availableFrames.push(f);
       button.disabled = false;
       button.className = "frame available";
@@ -795,66 +765,42 @@ async function refreshHourAvailability() {
       button.className = "frame missing";
     }
   }
-
   updateActiveButton();
 }
 
-function firstAvailableFrame() {
-  return availableFrames.length > 0 ? availableFrames[0] : 0;
-}
-
+function firstAvailableFrame() { return availableFrames.length ? availableFrames[0] : 0; }
 function updateActiveButton() {
-  document.querySelectorAll(".frame").forEach(button => {
-    button.classList.remove("active");
-
-    if (Number(button.dataset.fhr) === current) {
-      button.classList.add("active");
-    }
+  document.querySelectorAll(".frame").forEach(btn => {
+    btn.classList.remove("active");
+    if (Number(btn.dataset.fhr) === current) btn.classList.add("active");
   });
 }
 
 function setFrame(fhr) {
   if (!selectedRun) return;
-
   current = Number(fhr);
   slider.value = current;
   fhrLabel.textContent = String(current).padStart(3, "0");
-
-  leftPlot.src = imgSrc(leftProduct, current);
-
-  if (selectedView === "compare") {
-    rightPlot.src = imgSrc(rightProduct, current);
-  }
-
+  leftPlot.src = leftImgSrc(current);
+  if (isCompare()) rightPlot.src = rightImgSrc(current);
   updateActiveButton();
 }
 
 slider.addEventListener("input", () => {
-  const fhr = Number(slider.value);
-
-  if (availableFrames.includes(fhr)) {
-    setFrame(fhr);
-  } else {
-    slider.value = current;
-  }
+  const f = Number(slider.value);
+  if (availableFrames.includes(f)) setFrame(f);
+  else slider.value = current;
 });
 
 function togglePlay() {
   playing = !playing;
   playBtn.textContent = playing ? "⏸ Pause" : "▶ Play";
-
-  if (!playing) {
-    clearInterval(timer);
-    return;
-  }
-
+  if (!playing) { clearInterval(timer); return; }
   timer = setInterval(() => {
-    if (availableFrames.length === 0) return;
-
-    let index = availableFrames.indexOf(current);
-    index = (index + 1) % availableFrames.length;
-
-    setFrame(availableFrames[index]);
+    if (!availableFrames.length) return;
+    let idx = availableFrames.indexOf(current);
+    idx = (idx + 1) % availableFrames.length;
+    setFrame(availableFrames[idx]);
   }, 700);
 }
 
@@ -863,418 +809,192 @@ async function refreshViewer() {
   populateRunDropdown();
   await refreshHourAvailability();
   resetGifRange();
-
-  if (
-    current > maxFhr ||
-    !availableFrames.includes(current)
-  ) {
-    setFrame(firstAvailableFrame());
-  } else {
-    setFrame(current);
-  }
+  if (current > maxFhr || !availableFrames.includes(current)) setFrame(firstAvailableFrame());
+  else setFrame(current);
 }
 
-async function latestRun() {
-  selectedRun = "";
-  await refreshViewer();
-  setFrame(firstAvailableFrame());
-}
+async function latestRun() { selectedRun = ""; await refreshViewer(); setFrame(firstAvailableFrame()); }
 
 async function changeView() {
   selectedView = viewSelect.value;
   selectedRun = "";
-
+  if (selectedView === "compare_products") {
+    rightModel = selectedModel;
+    rightMember = selectedMember;
+    rightProduct = selectedModel === "hrrr" ? "max_uh_02" : "hail_swath";
+  } else if (selectedView === "compare_models") {
+    if (selectedModel === rightModel) { selectedModel = "hrrr"; rightModel = "rrfs"; }
+    leftProduct = "refl_uh";
+    rightProduct = "refl_uh";
+    modelSelect.value = selectedModel;
+    rightModelSelect.value = rightModel;
+  }
   updateProductOptions();
-  updateViewVisibility();
+  updateVisibility();
   updateTitle();
-
   await refreshViewer();
 }
 
 async function changeModel() {
   selectedModel = modelSelect.value;
-
-  if (selectedModel !== "refs") {
-    selectedMember = "m01";
-  } else {
-    selectedMember = memberSelect.value;
-  }
-
+  if (selectedModel !== "refs") { selectedMember = "m01"; memberSelect.value = selectedMember; }
   leftProduct = "refl_uh";
-  rightProduct = selectedModel === "hrrr" ? "max_uh_02" : "hail_swath";
+  if (selectedView === "compare_products") {
+    rightModel = selectedModel;
+    rightMember = selectedMember;
+    rightProduct = selectedModel === "hrrr" ? "max_uh_02" : "hail_swath";
+  }
   selectedRun = "";
+  updateProductOptions(); updateVisibility(); updateTitle();
+  await refreshViewer();
+}
 
-  updateMemberVisibility();
-  updateProductOptions();
-  updateViewVisibility();
-  updateTitle();
-
+async function changeRightModel() {
+  rightModel = rightModelSelect.value;
+  if (rightModel !== "refs") { rightMember = "m01"; rightMemberSelect.value = rightMember; }
+  rightProduct = "refl_uh";
+  selectedRun = "";
+  updateProductOptions(); updateVisibility(); updateTitle();
   await refreshViewer();
 }
 
 async function changeMember() {
   selectedMember = memberSelect.value;
-  selectedRun = "";
-
-  updateTitle();
-  await refreshViewer();
+  if (selectedView === "compare_products") rightMember = selectedMember;
+  selectedRun = ""; updateVisibility(); updateTitle(); await refreshViewer();
 }
+async function changeRightMember() { rightMember = rightMemberSelect.value; selectedRun = ""; updateTitle(); await refreshViewer(); }
 
 async function changeLeftProduct() {
   leftProduct = leftProductSelect.value;
-
-  if (
-    selectedView === "compare" &&
-    leftProduct === rightProduct
-  ) {
-    const other = productOptionsForModel().find(
-      item => item[0] !== leftProduct
-    );
-
-    if (other) {
-      rightProduct = other[0];
-      rightProductSelect.value = rightProduct;
-    }
+  if (selectedView === "compare_products" && leftProduct === rightProduct) {
+    const other = productOptionsForModel(selectedModel).find(x => x[0] !== leftProduct);
+    if (other) { rightProduct = other[0]; rightProductSelect.value = rightProduct; }
   }
-
-  selectedRun = "";
-  updateTitle();
-  await refreshViewer();
+  selectedRun = ""; updateTitle(); await refreshViewer();
 }
 
 async function changeRightProduct() {
   rightProduct = rightProductSelect.value;
-
-  if (rightProduct === leftProduct) {
-    const other = productOptionsForModel().find(
-      item => item[0] !== rightProduct
-    );
-
-    if (other) {
-      leftProduct = other[0];
-      leftProductSelect.value = leftProduct;
-    }
+  if (selectedView === "compare_products" && rightProduct === leftProduct) {
+    const other = productOptionsForModel(selectedModel).find(x => x[0] !== rightProduct);
+    if (other) { leftProduct = other[0]; leftProductSelect.value = leftProduct; }
   }
-
-  selectedRun = "";
-  updateTitle();
-  await refreshViewer();
+  selectedRun = ""; updateTitle(); await refreshViewer();
 }
 
 async function changeRun() {
   selectedRun = runSelect.value;
-  await refreshHourAvailability();
-  resetGifRange();
-
-  if (
-    current > maxFhr ||
-    !availableFrames.includes(current)
-  ) {
-    setFrame(firstAvailableFrame());
-  } else {
-    setFrame(current);
-  }
+  await refreshHourAvailability(); resetGifRange();
+  if (current > maxFhr || !availableFrames.includes(current)) setFrame(firstAvailableFrame());
+  else setFrame(current);
 }
 
 async function changeDomain() {
   selectedDomain = domainSelect.value;
   await refreshHourAvailability();
-
-  if (!availableFrames.includes(current)) {
-    setFrame(firstAvailableFrame());
-  } else {
-    setFrame(current);
-  }
+  if (!availableFrames.includes(current)) setFrame(firstAvailableFrame()); else setFrame(current);
 }
 
-function buildDownloadName(extension, startFhr = null, endFhr = null) {
-  const memberPart =
-    selectedModel === "refs"
-      ? "_" + selectedMember
-      : "";
-
-  const productPart =
-    selectedView === "compare"
-      ? `${leftProduct}_vs_${rightProduct}`
-      : leftProduct;
-
-  let filename =
-    selectedModel +
-    memberPart +
-    "_" +
-    productPart +
-    "_" +
-    selectedRun +
-    "_" +
-    selectedDomain;
-
-  if (startFhr !== null && endFhr !== null) {
-    filename +=
-      "_f" +
-      String(startFhr).padStart(3, "0") +
-      "-f" +
-      String(endFhr).padStart(3, "0");
-  } else {
-    filename +=
-      "_f" +
-      String(current).padStart(3, "0");
-  }
-
-  return filename + "." + extension;
+function downloadName(ext, start=null, end=null) {
+  let base;
+  if (selectedView === "single") base = `${selectedModel}_${leftProduct}`;
+  else if (selectedView === "compare_products") base = `${selectedModel}_${leftProduct}_vs_${rightProduct}`;
+  else base = `${selectedModel}_${leftProduct}_vs_${rightModel}_${rightProduct}`;
+  base += `_${selectedRun}_${selectedDomain}`;
+  base += start !== null ? `_f${String(start).padStart(3,"0")}-f${String(end).padStart(3,"0")}` : `_f${String(current).padStart(3,"0")}`;
+  return base + "." + ext;
 }
 
 function downloadBlob(blob, filename) {
-  const objectUrl = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-
-  link.href = objectUrl;
-  link.download = filename;
-
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  const url = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-async function fetchImage(product, fhr) {
-  const response = await fetch(imgSrc(product, fhr));
-
-  if (!response.ok) {
-    throw new Error(`Could not load ${product} F${fhr}`);
-  }
-
-  const blob = await response.blob();
-  const objectUrl = URL.createObjectURL(blob);
-
+async function fetchImage(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Image fetch failed");
+  const blob = await response.blob(), objectUrl = URL.createObjectURL(blob);
   try {
     return await new Promise((resolve, reject) => {
-      const image = new Image();
-
-      image.onload = () => resolve(image);
-      image.onerror = reject;
-      image.src = objectUrl;
+      const img = new Image(); img.onload = () => resolve(img); img.onerror = reject; img.src = objectUrl;
     });
-  } finally {
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-  }
+  } finally { setTimeout(() => URL.revokeObjectURL(objectUrl), 1000); }
 }
 
-function drawImageContain(ctx, image, x, y, width, height) {
-  const scale = Math.min(width / image.width, height / image.height);
-  const drawWidth = image.width * scale;
-  const drawHeight = image.height * scale;
-  const drawX = x + (width - drawWidth) / 2;
-  const drawY = y + (height - drawHeight) / 2;
-
-  ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+function drawContain(ctx, img, x, y, w, h) {
+  const scale = Math.min(w/img.width, h/img.height), dw = img.width*scale, dh = img.height*scale;
+  ctx.drawImage(img, x+(w-dw)/2, y+(h-dh)/2, dw, dh);
 }
 
 async function createCombinedCanvas(fhr) {
-  const leftImage = await fetchImage(leftProduct, fhr);
-
-  if (selectedView === "single") {
-    const canvas = document.createElement("canvas");
-    canvas.width = leftImage.width;
-    canvas.height = leftImage.height;
-
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(leftImage, 0, 0);
-
-    return canvas;
+  const left = await fetchImage(leftImgSrc(fhr));
+  if (!isCompare()) {
+    const canvas = document.createElement("canvas"); canvas.width = left.width; canvas.height = left.height;
+    canvas.getContext("2d").drawImage(left,0,0); return canvas;
   }
-
-  const rightImage = await fetchImage(rightProduct, fhr);
-  const panelWidth = Math.max(leftImage.width, rightImage.width);
-  const panelHeight = Math.max(leftImage.height, rightImage.height);
-
-  const canvas = document.createElement("canvas");
-  canvas.width = panelWidth * 2;
-  canvas.height = panelHeight;
-
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  drawImageContain(ctx, leftImage, 0, 0, panelWidth, panelHeight);
-  drawImageContain(
-    ctx,
-    rightImage,
-    panelWidth,
-    0,
-    panelWidth,
-    panelHeight
-  );
-
-  return canvas;
+  const right = await fetchImage(rightImgSrc(fhr));
+  const w = Math.max(left.width,right.width), h = Math.max(left.height,right.height);
+  const canvas = document.createElement("canvas"); canvas.width = w*2; canvas.height = h;
+  const ctx = canvas.getContext("2d"); ctx.fillStyle="#000"; ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawContain(ctx,left,0,0,w,h); drawContain(ctx,right,w,0,w,h); return canvas;
 }
 
 async function savePNG() {
-  if (!selectedRun || !availableFrames.includes(current)) {
-    alert("No available frame is currently displayed.");
-    return;
-  }
-
-  savePngBtn.disabled = true;
-  saveStatus.textContent = "Saving PNG...";
-
+  if (!selectedRun || !availableFrames.includes(current)) return alert("No available frame is currently displayed.");
+  savePngBtn.disabled = true; saveStatus.textContent = "Saving PNG...";
   try {
     const canvas = await createCombinedCanvas(current);
-
-    canvas.toBlob(blob => {
-      if (!blob) {
-        throw new Error("Could not create PNG");
-      }
-
-      downloadBlob(blob, buildDownloadName("png"));
-    }, "image/png");
-
+    canvas.toBlob(blob => { if (blob) downloadBlob(blob, downloadName("png")); }, "image/png");
     saveStatus.textContent = "PNG saved";
-  } catch (err) {
-    console.error(err);
-    alert("The PNG could not be created.");
-    saveStatus.textContent = "";
-  } finally {
-    savePngBtn.disabled = false;
-
-    setTimeout(() => {
-      if (!creatingGif) saveStatus.textContent = "";
-    }, 2500);
-  }
+  } catch(err) { console.error(err); alert("The PNG could not be created."); saveStatus.textContent=""; }
+  finally { savePngBtn.disabled=false; setTimeout(()=>{if(!creatingGif) saveStatus.textContent="";},2500); }
 }
 
-function setGifControlsDisabled(disabled) {
-  saveGifBtn.disabled = disabled;
-  savePngBtn.disabled = disabled;
-  gifStart.disabled = disabled;
-  gifEnd.disabled = disabled;
-  gifDelay.disabled = disabled;
-  gifLoop.disabled = disabled;
-}
+function setGifDisabled(v) { [saveGifBtn,savePngBtn,gifStart,gifEnd,gifDelay,gifLoop].forEach(el=>el.disabled=v); }
 
 async function saveGIF() {
   if (creatingGif) return;
-
-  if (typeof GIF === "undefined") {
-    alert("gif.js did not load.");
-    return;
-  }
-
-  const startHour = Number(gifStart.value);
-  const endHour = Number(gifEnd.value);
-
-  const selectedFrames = availableFrames.filter(
-    fhr => fhr >= startHour && fhr <= endHour
-  );
-
-  if (selectedFrames.length === 0) {
-    alert("No available frames were found in the selected GIF range.");
-    return;
-  }
-
-  creatingGif = true;
-  setGifControlsDisabled(true);
-
-  const delay = Number(gifDelay.value);
-
-  const gif = new GIF({
-    workers: 2,
-    quality: 10,
-    repeat: gifLoop.checked ? 0 : -1,
-    workerScript: "assets/gif.worker.js"
-  });
-
+  if (typeof GIF === "undefined") return alert("gif.js did not load.");
+  const start=Number(gifStart.value), end=Number(gifEnd.value);
+  const frames=availableFrames.filter(f=>f>=start&&f<=end);
+  if (!frames.length) return alert("No available frames were found in the selected GIF range.");
+  creatingGif=true; setGifDisabled(true);
+  const delay=Number(gifDelay.value);
+  const gif=new GIF({workers:2,quality:10,repeat:gifLoop.checked?0:-1,workerScript:"assets/gif.worker.js"});
   try {
-    for (let i = 0; i < selectedFrames.length; i++) {
-      const fhr = selectedFrames[i];
-
-      saveGifBtn.textContent =
-        `Loading ${i + 1}/${selectedFrames.length}`;
-      saveStatus.textContent = `Loading ${formatFhr(fhr)}`;
-
-      const canvas = await createCombinedCanvas(fhr);
-
-      gif.addFrame(canvas, {
-        copy: true,
-        delay:
-          i === selectedFrames.length - 1
-            ? Math.max(delay, 1000)
-            : delay
-      });
+    for(let i=0;i<frames.length;i++) {
+      const f=frames[i]; saveGifBtn.textContent=`Loading ${i+1}/${frames.length}`; saveStatus.textContent=`Loading ${formatFhr(f)}`;
+      const canvas=await createCombinedCanvas(f);
+      gif.addFrame(canvas,{copy:true,delay:i===frames.length-1?Math.max(delay,1000):delay});
     }
-
-    saveGifBtn.textContent = "Creating...";
-    saveStatus.textContent =
-      `Rendering ${selectedFrames.length} frames`;
-
-    gif.on("progress", progress => {
-      saveStatus.textContent =
-        `Rendering ${Math.round(progress * 100)}%`;
+    saveGifBtn.textContent="Creating...";
+    gif.on("progress",p=>saveStatus.textContent=`Rendering ${Math.round(p*100)}%`);
+    gif.on("finished",blob=>{
+      downloadBlob(blob,downloadName("gif",start,end)); creatingGif=false; setGifDisabled(false);
+      saveGifBtn.textContent="Save GIF"; saveStatus.textContent="GIF saved"; setTimeout(()=>saveStatus.textContent="",2500);
     });
-
-    gif.on("finished", blob => {
-      downloadBlob(
-        blob,
-        buildDownloadName("gif", startHour, endHour)
-      );
-
-      creatingGif = false;
-      setGifControlsDisabled(false);
-      saveGifBtn.textContent = "Save GIF";
-      saveStatus.textContent = "GIF saved";
-
-      setTimeout(() => {
-        saveStatus.textContent = "";
-      }, 2500);
-    });
-
     gif.render();
-  } catch (err) {
-    console.error(err);
-
-    creatingGif = false;
-    setGifControlsDisabled(false);
-    saveGifBtn.textContent = "Save GIF";
-    saveStatus.textContent = "";
-
+  } catch(err) {
+    console.error(err); creatingGif=false; setGifDisabled(false); saveGifBtn.textContent="Save GIF"; saveStatus.textContent="";
     alert("The GIF could not be created.");
   }
 }
 
-gifStart.addEventListener("input", () => {
-  if (Number(gifStart.value) > Number(gifEnd.value)) {
-    gifEnd.value = gifStart.value;
-  }
-
-  syncGifRangeLabels();
-});
-
-gifEnd.addEventListener("input", () => {
-  if (Number(gifEnd.value) < Number(gifStart.value)) {
-    gifStart.value = gifEnd.value;
-  }
-
-  syncGifRangeLabels();
-});
+gifStart.addEventListener("input",()=>{if(Number(gifStart.value)>Number(gifEnd.value))gifEnd.value=gifStart.value;syncGifRangeLabels();});
+gifEnd.addEventListener("input",()=>{if(Number(gifEnd.value)<Number(gifStart.value))gifStart.value=gifEnd.value;syncGifRangeLabels();});
 
 async function init() {
-  updateMemberVisibility();
-  updateProductOptions();
-  updateViewVisibility();
-  updateTitle();
-
-  await refreshViewer();
-  setFrame(firstAvailableFrame());
-
-  setInterval(async () => {
-    if (!creatingGif) {
-      await refreshViewer();
-    }
-  }, 30000);
+  updateProductOptions(); updateVisibility(); updateTitle();
+  await refreshViewer(); setFrame(firstAvailableFrame());
+  setInterval(async()=>{if(!creatingGif)await refreshViewer();},30000);
 }
-
 init();
 </script>
+
+</body>
+</html>
 
 </body>
 </html>
