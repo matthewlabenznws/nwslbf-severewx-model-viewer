@@ -12,3 +12,4 @@ matplotlib
 xarray
 boto3
 botocore
+metpy
