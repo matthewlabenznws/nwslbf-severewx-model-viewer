@@ -2804,48 +2804,6 @@ def plot_domain_from_fields(
             ]
         )
 
-        # ====================================================
-        # PRODUCT KEY
-        # ====================================================
-
-        ax.text(
-            0.50,
-            0.015,
-
-            "Contours: DCAPE (J/kg) | "
-            "Barbs: 10-m wind (kt)",
-
-            transform=
-                ax.transAxes,
-
-            ha=
-                "center",
-
-            va=
-                "bottom",
-
-            fontsize=
-                8,
-
-            weight=
-                "bold",
-
-            color=
-                "black",
-
-            zorder=
-                40,
-
-            path_effects=[
-                pe.withStroke(
-                    linewidth=
-                        2.5,
-
-                    foreground=
-                        "white"
-                )
-            ]
-        )
 
         # ====================================================
         # SAVE
