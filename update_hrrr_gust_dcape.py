@@ -32,6 +32,7 @@ import zipfile
 import time
 import requests
 import boto3
+
 import numpy as np
 import geopandas as gpd
 
@@ -86,6 +87,7 @@ def upload_to_r2(
     remote_key,
     content_type="image/png"
 ):
+
     s3.upload_file(
         local_file,
         BUCKET,
@@ -116,11 +118,15 @@ extract_path = os.path.join(
     "assets"
 )
 
-if os.path.exists(zip_path):
+if os.path.exists(
+    zip_path
+):
+
     with zipfile.ZipFile(
         zip_path,
         "r"
     ) as zip_ref:
+
         zip_ref.extractall(
             extract_path
         )
@@ -135,16 +141,27 @@ if os.path.exists(zip_path):
 DOMAINS = {
 
     "regional": {
-        "label": "Regional",
-        "extent": [
-            -107.5,
-            -93.0,
-            38.5,
-            44.2
-        ],
-        "title_size": 13,
-        "subtitle_size": 11,
-        "barb_skip": 20,
+
+        "label":
+            "Regional",
+
+        "extent":
+            [
+                -107.5,
+                -93.0,
+                38.5,
+                44.2
+            ],
+
+        "title_size":
+            13,
+
+        "subtitle_size":
+            11,
+
+        "barb_skip":
+            20,
+
     },
 
 }
@@ -183,16 +200,15 @@ LOGO_PATH = os.path.join(
 # PRODUCT SETTINGS
 # ============================================================
 
-# Gust/DCAPE are valid at F000
 START_FHR = 0
 
 PLOT_10M_WIND_BARBS = True
 
 # HRRR ~3 km.
-# 6 means roughly ~18 km DCAPE profile spacing.
+# 6 = roughly 18 km DCAPE sampling.
 DCAPE_STRIDE = 6
 
-# Slight smoothing to make the DCAPE contours cleaner.
+# Slight smoothing to clean up contours.
 DCAPE_SMOOTH_SIGMA = 0.7
 
 MIN_GUST_MPH = 15.0
@@ -205,20 +221,49 @@ PLOT_CITY_LABELS = False
 # ============================================================
 
 STATIONS = {
-    "Gordon":       (-102.2038, 42.8061),
-    "Ellsworth":    (-102.3172, 42.0628),
-    "Oshkosh":      (-102.3465, 41.4047),
-    "Ogallala":     (-101.7205, 41.1275),
-    "Mullen":       (-101.0427, 42.0425),
-    "Valentine":    (-100.5514, 42.8586),
-    "Ainsworth":    (-99.8516, 42.5467),
-    "Burwell":      (-99.1766, 41.7666),
-    "North Platte": (-100.6689, 41.1220),
-    "Broken Bow":   (-99.6385, 41.4365),
-    "Imperial":     (-101.6243, 40.5106),
-    "Curtis":       (-100.5219, 40.6344),
-    "O'Neill":      (-98.6470, 42.4578),
-    "Butte":        (-98.8511, 42.9130),
+
+    "Gordon":
+        (-102.2038, 42.8061),
+
+    "Ellsworth":
+        (-102.3172, 42.0628),
+
+    "Oshkosh":
+        (-102.3465, 41.4047),
+
+    "Ogallala":
+        (-101.7205, 41.1275),
+
+    "Mullen":
+        (-101.0427, 42.0425),
+
+    "Valentine":
+        (-100.5514, 42.8586),
+
+    "Ainsworth":
+        (-99.8516, 42.5467),
+
+    "Burwell":
+        (-99.1766, 41.7666),
+
+    "North Platte":
+        (-100.6689, 41.1220),
+
+    "Broken Bow":
+        (-99.6385, 41.4365),
+
+    "Imperial":
+        (-101.6243, 40.5106),
+
+    "Curtis":
+        (-100.5219, 40.6344),
+
+    "O'Neill":
+        (-98.6470, 42.4578),
+
+    "Butte":
+        (-98.8511, 42.9130),
+
 }
 
 
@@ -232,7 +277,9 @@ GUST_BOUNDS = np.arange(
     1
 )
 
+
 GUST_COLORS = [
+
     "#ffffff",
     "#f1f8ff",
     "#def0fd",
@@ -296,13 +343,16 @@ GUST_COLORS = [
     "#ad7a26",
     "#a77021",
     "#a1661c",
-    "#9b5c17"
+    "#9b5c17",
+
 ]
+
 
 gust_cmap = ListedColormap(
     GUST_COLORS,
     name="gust_bins"
 )
+
 
 gust_norm = BoundaryNorm(
     GUST_BOUNDS,
@@ -312,12 +362,12 @@ gust_norm = BoundaryNorm(
 
 
 # ============================================================
-# DCAPE CONTOUR STYLE
+# DCAPE STYLE
 #
 # EVERY 100 J/KG
-# 500 -> 3000 J/KG
 #
-# YELLOW/GOLD -> ORANGE -> RED -> DARK RED
+# THINNER THAN PREVIOUS VERSION SO THE GUST FIELD
+# REMAINS THE DOMINANT FIELD.
 # ============================================================
 
 DCAPE_LEVELS = np.arange(
@@ -326,7 +376,9 @@ DCAPE_LEVELS = np.arange(
     100
 )
 
+
 DCAPE_COLORS = [
+
     "#f8d500",   # 500
     "#f6cc00",   # 600
     "#f4c200",   # 700
@@ -357,19 +409,32 @@ DCAPE_COLORS = [
     "#7e0000",   # 2800
     "#730000",   # 2900
     "#680000",   # 3000
+
 ]
 
 
-# Thicker contour every 500 J/kg
+# ------------------------------------------------------------
+# THINNER DCAPE CONTOURS
+#
+# Every 500 J/kg remains slightly thicker.
+# ------------------------------------------------------------
+
 DCAPE_WIDTHS = []
+
 
 for level in DCAPE_LEVELS:
 
     if level % 500 == 0:
-        DCAPE_WIDTHS.append(2.0)
+
+        DCAPE_WIDTHS.append(
+            1.25
+        )
 
     else:
-        DCAPE_WIDTHS.append(1.15)
+
+        DCAPE_WIDTHS.append(
+            0.65
+        )
 
 
 # ============================================================
@@ -389,7 +454,9 @@ def url_exists(
             allow_redirects=True
         )
 
-        return r.status_code == 200
+        return (
+            r.status_code == 200
+        )
 
     except Exception:
 
@@ -397,7 +464,7 @@ def url_exists(
 
 
 # ============================================================
-# FIND LATEST HRRR CYCLE
+# FIND LATEST HRRR
 # ============================================================
 
 def find_latest_hrrr_cycle(
@@ -410,6 +477,7 @@ def find_latest_hrrr_cycle(
         microsecond=0
     )
 
+
     for back in range(
         max_back_hours + 1
     ):
@@ -417,22 +485,34 @@ def find_latest_hrrr_cycle(
         dt = (
             now
             -
-            timedelta(hours=back)
+            timedelta(
+                hours=back
+            )
         )
+
 
         cycle_date = dt.strftime(
             "%Y%m%d"
         )
 
+
         cycle_hour = dt.hour
 
+
         test_url = (
+
             "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/"
+
             f"hrrr.{cycle_date}/"
+
             "conus/"
+
             f"hrrr.t{cycle_hour:02d}z."
+
             "wrfsfcf00.grib2"
+
         )
+
 
         if url_exists(
             test_url
@@ -449,6 +529,7 @@ def find_latest_hrrr_cycle(
                 cycle_hour
             )
 
+
     raise RuntimeError(
         "Could not find a recent HRRR cycle."
     )
@@ -464,7 +545,9 @@ def to_lon180(
 
     return (
         (
-            np.asarray(lon)
+            np.asarray(
+                lon
+            )
             +
             180
         )
@@ -500,32 +583,40 @@ def get_lat_lon(
 ):
 
     if (
-        "latitude" in da.coords
+        "latitude"
+        in da.coords
         and
-        "longitude" in da.coords
+        "longitude"
+        in da.coords
     ):
 
         lat = np.asarray(
             da.latitude.values
         )
 
+
         lon = to_lon180(
             da.longitude.values
         )
 
+
     elif (
-        "lat" in da.coords
+        "lat"
+        in da.coords
         and
-        "lon" in da.coords
+        "lon"
+        in da.coords
     ):
 
         lat = np.asarray(
             da.lat.values
         )
 
+
         lon = to_lon180(
             da.lon.values
         )
+
 
     else:
 
@@ -533,6 +624,7 @@ def get_lat_lon(
             "Could not find latitude/"
             "longitude coordinates."
         )
+
 
     return (
         lat,
@@ -554,18 +646,24 @@ def hrrr_field(
 ):
 
     init_dt = datetime.strptime(
-        f"{cycle_date}{cycle_hour:02d}",
+        f"{cycle_date}"
+        f"{cycle_hour:02d}",
         "%Y%m%d%H"
     )
 
+
     priority_sets = [
+
         ["aws"],
         ["google"],
         ["azure"],
         ["nomads"],
+
     ]
 
+
     last_err = None
+
 
     for priority in priority_sets:
 
@@ -578,6 +676,7 @@ def hrrr_field(
                 f"source={priority[0]}"
             )
 
+
             H = Herbie(
                 init_dt,
                 model="hrrr",
@@ -587,10 +686,12 @@ def hrrr_field(
                 verbose=False
             )
 
+
             ds = H.xarray(
                 search,
                 remove_grib=False
             )
+
 
             if isinstance(
                 ds,
@@ -598,6 +699,7 @@ def hrrr_field(
             ):
 
                 ds = ds[0]
+
 
             if len(
                 ds.data_vars
@@ -609,14 +711,17 @@ def hrrr_field(
                     f"{search}"
                 )
 
+
             var = list(
                 ds.data_vars
             )[0]
+
 
             return (
                 ds[var]
                 .squeeze()
             )
+
 
         except Exception as e:
 
@@ -625,7 +730,9 @@ def hrrr_field(
                 f"{priority[0]}: {e}"
             )
 
+
             last_err = e
+
 
     raise RuntimeError(
         f"Could not open {label} "
@@ -649,19 +756,53 @@ def get_domain_indices(
         extent
     )
 
+
     mask = (
-        np.isfinite(lat)
+
+        np.isfinite(
+            lat
+        )
+
         &
-        np.isfinite(lon)
+
+        np.isfinite(
+            lon
+        )
+
         &
-        (lon >= lon_min)
+
+        (
+            lon
+            >=
+            lon_min
+        )
+
         &
-        (lon <= lon_max)
+
+        (
+            lon
+            <=
+            lon_max
+        )
+
         &
-        (lat >= lat_min)
+
+        (
+            lat
+            >=
+            lat_min
+        )
+
         &
-        (lat <= lat_max)
+
+        (
+            lat
+            <=
+            lat_max
+        )
+
     )
+
 
     if not np.any(
         mask
@@ -672,39 +813,48 @@ def get_domain_indices(
             "inside selected domain."
         )
 
+
     iy, ix = np.where(
         mask
     )
+
 
     iy0 = max(
         iy.min() - padding,
         0
     )
 
+
     iy1 = min(
         iy.max() + padding + 1,
         lat.shape[0]
     )
+
 
     ix0 = max(
         ix.min() - padding,
         0
     )
 
+
     ix1 = min(
         ix.max() + padding + 1,
         lon.shape[1]
     )
 
+
     return (
+
         slice(
             iy0,
             iy1
         ),
+
         slice(
             ix0,
             ix1
         )
+
     )
 
 
@@ -731,6 +881,7 @@ def add_shapefile_outline(
 
         return
 
+
     gdf = (
         gpd
         .read_file(
@@ -741,6 +892,7 @@ def add_shapefile_outline(
         )
     )
 
+
     gdf = gdf.cx[
         LON_MIN - 1:
         LON_MAX + 1,
@@ -748,6 +900,7 @@ def add_shapefile_outline(
         LAT_MIN - 1:
         LAT_MAX + 1
     ]
+
 
     ax.add_geometries(
         gdf.geometry,
@@ -771,12 +924,16 @@ def get_lbf_cwa_geom(
         cwa_shp_path
     )
 
+
     recs = list(
         reader.records()
     )
 
+
     geoms = [
+
         r.geometry
+
         for r in recs
 
         if (
@@ -802,14 +959,19 @@ def get_lbf_cwa_geom(
             ==
             "LBF"
         )
+
     ]
+
 
     if not geoms:
 
         geoms = [
+
             r.geometry
             for r in recs
+
         ]
+
 
     return unary_union(
         geoms
@@ -833,15 +995,19 @@ def add_counties_clipped_to_cwa(
         counties_shp_path
     )
 
+
     cwa_p = prep(
         cwa_geom
     )
 
+
     clipped = []
+
 
     for r in reader.records():
 
         g = r.geometry
+
 
         if cwa_p.intersects(
             g
@@ -851,11 +1017,13 @@ def add_counties_clipped_to_cwa(
                 cwa_geom
             )
 
+
             if not inter.is_empty:
 
                 clipped.append(
                     inter
                 )
+
 
     ax.add_geometries(
         clipped,
@@ -923,22 +1091,31 @@ def get_pressure_dimension(
     da
 ):
 
-    if "isobaricInhPa" in da.dims:
+    if (
+        "isobaricInhPa"
+        in da.dims
+    ):
 
         p_dim = (
             "isobaricInhPa"
         )
+
 
         pressure = np.asarray(
             da[p_dim].values,
             dtype=float
         )
 
-    elif "isobaricInPa" in da.dims:
+
+    elif (
+        "isobaricInPa"
+        in da.dims
+    ):
 
         p_dim = (
             "isobaricInPa"
         )
+
 
         pressure = (
             np.asarray(
@@ -949,6 +1126,7 @@ def get_pressure_dimension(
             100.0
         )
 
+
     else:
 
         raise RuntimeError(
@@ -956,6 +1134,7 @@ def get_pressure_dimension(
             "pressure dimension. "
             f"Dimensions: {da.dims}"
         )
+
 
     return (
         p_dim,
@@ -984,6 +1163,7 @@ def calculate_dcape_grid(
     print("CALCULATING DCAPE")
     print("=" * 70)
 
+
     # --------------------------------------------------------
     # PRESSURE COORDINATE
     # --------------------------------------------------------
@@ -996,39 +1176,58 @@ def calculate_dcape_grid(
         temp_da
     )
 
+
     # --------------------------------------------------------
-    # 1000-400 MB
+    # KEEP 1000-400 MB
     # --------------------------------------------------------
 
     use_levels = (
-        (pressure_hpa <= 1000.0)
+
+        (
+            pressure_hpa
+            <=
+            1000.0
+        )
+
         &
-        (pressure_hpa >= 400.0)
+
+        (
+            pressure_hpa
+            >=
+            400.0
+        )
+
     )
+
 
     p = pressure_hpa[
         use_levels
     ]
 
+
     level_indices = np.where(
         use_levels
     )[0]
 
+
     # --------------------------------------------------------
-    # HIGH PRESSURE -> LOW PRESSURE
+    # HIGH -> LOW PRESSURE
     # --------------------------------------------------------
 
     sort_order = np.argsort(
         p
     )[::-1]
 
+
     p = p[
         sort_order
     ]
 
+
     level_indices = level_indices[
         sort_order
     ]
+
 
     # --------------------------------------------------------
     # DOMAIN SUBSET
@@ -1041,15 +1240,21 @@ def calculate_dcape_grid(
         padding=2
     )
 
+
     # --------------------------------------------------------
-    # PRESSURE HORIZONTAL DIMENSIONS
+    # HORIZONTAL DIMENSIONS
     # --------------------------------------------------------
 
     horizontal_dims = [
+
         d
+
         for d in temp_da.dims
+
         if d != p_dim
+
     ]
+
 
     if len(
         horizontal_dims
@@ -1060,21 +1265,27 @@ def calculate_dcape_grid(
             f"dimensions: {temp_da.dims}"
         )
 
+
     y_dim = (
         horizontal_dims[0]
     )
 
+
     x_dim = (
         horizontal_dims[1]
     )
+
 
     # --------------------------------------------------------
     # PRESSURE PROFILES
     # --------------------------------------------------------
 
     T_reg = (
+
         temp_da
+
         .isel({
+
             p_dim:
                 level_indices,
 
@@ -1083,18 +1294,26 @@ def calculate_dcape_grid(
 
             x_dim:
                 xs
+
         })
+
         .transpose(
             p_dim,
             y_dim,
             x_dim
         )
+
         .values
+
     )
+
 
     Td_reg = (
+
         dewpoint_da
+
         .isel({
+
             p_dim:
                 level_indices,
 
@@ -1103,17 +1322,22 @@ def calculate_dcape_grid(
 
             x_dim:
                 xs
+
         })
+
         .transpose(
             p_dim,
             y_dim,
             x_dim
         )
+
         .values
+
     )
 
+
     # --------------------------------------------------------
-    # SURFACE DATA ON SAME HRRR GRID
+    # SURFACE DATA
     # --------------------------------------------------------
 
     psfc_reg = psfc[
@@ -1121,25 +1345,30 @@ def calculate_dcape_grid(
         xs
     ]
 
+
     t2_reg = t2[
         ys,
         xs
     ]
+
 
     td2_reg = td2[
         ys,
         xs
     ]
 
+
     lat_reg = lat[
         ys,
         xs
     ]
 
+
     lon_reg = lon[
         ys,
         xs
     ]
+
 
     # --------------------------------------------------------
     # SAFETY CHECK
@@ -1158,6 +1387,7 @@ def calculate_dcape_grid(
             f"{psfc_reg.shape}"
         )
 
+
     # --------------------------------------------------------
     # SAMPLED GRID
     # --------------------------------------------------------
@@ -1166,17 +1396,20 @@ def calculate_dcape_grid(
         psfc_reg.shape
     )
 
+
     iy = np.arange(
         0,
         ny,
         stride
     )
 
+
     ix = np.arange(
         0,
         nx,
         stride
     )
+
 
     dcape = np.full(
         (
@@ -1187,12 +1420,14 @@ def calculate_dcape_grid(
         dtype=float
     )
 
+
     lat_dcape = lat_reg[
         np.ix_(
             iy,
             ix
         )
     ]
+
 
     lon_dcape = lon_reg[
         np.ix_(
@@ -1201,19 +1436,23 @@ def calculate_dcape_grid(
         )
     ]
 
+
     total = (
         len(iy)
         *
         len(ix)
     )
 
+
     count = 0
+
 
     print(
         f"DCAPE sampled grid: "
         f"{len(iy)} x {len(ix)} "
         f"= {total:,} profiles"
     )
+
 
     # ========================================================
     # PROFILE LOOP
@@ -1229,6 +1468,7 @@ def calculate_dcape_grid(
 
             count += 1
 
+
             if (
                 count % 250
                 ==
@@ -1239,6 +1479,7 @@ def calculate_dcape_grid(
                     f"DCAPE profiles: "
                     f"{count:,}/{total:,}"
                 )
+
 
             try:
 
@@ -1257,6 +1498,7 @@ def calculate_dcape_grid(
                     100.0
                 )
 
+
                 ts = float(
                     t2_reg[
                         y,
@@ -1264,12 +1506,14 @@ def calculate_dcape_grid(
                     ]
                 )
 
+
                 tds = float(
                     td2_reg[
                         y,
                         x
                     ]
                 )
+
 
                 if not (
                     np.isfinite(ps)
@@ -1281,6 +1525,7 @@ def calculate_dcape_grid(
 
                     continue
 
+
                 # ------------------------------------------------
                 # PROFILE
                 # ------------------------------------------------
@@ -1291,43 +1536,55 @@ def calculate_dcape_grid(
                     x
                 ]
 
+
                 td_profile = Td_reg[
                     :,
                     y,
                     x
                 ]
 
+
                 # ------------------------------------------------
                 # REMOVE BELOW-GROUND LEVELS
                 # ------------------------------------------------
 
                 valid = (
+
                     np.isfinite(
                         temp_profile
                     )
+
                     &
+
                     np.isfinite(
                         td_profile
                     )
+
                     &
+
                     (
                         p
                         <
                         ps - 1.0
                     )
+
                 )
+
 
                 p_valid = p[
                     valid
                 ]
 
+
                 t_valid = temp_profile[
                     valid
                 ]
 
+
                 td_valid = td_profile[
                     valid
                 ]
+
 
                 if len(
                     p_valid
@@ -1335,7 +1592,11 @@ def calculate_dcape_grid(
 
                     continue
 
-                # Need full 700-500 mb source layer
+
+                # ------------------------------------------------
+                # MUST INCLUDE 700-500 MB LAYER
+                # ------------------------------------------------
+
                 if (
                     np.nanmax(
                         p_valid
@@ -1345,6 +1606,7 @@ def calculate_dcape_grid(
                 ):
 
                     continue
+
 
                 if (
                     np.nanmin(
@@ -1356,8 +1618,9 @@ def calculate_dcape_grid(
 
                     continue
 
+
                 # ------------------------------------------------
-                # ADD MODEL SURFACE
+                # ADD SURFACE POINT
                 # ------------------------------------------------
 
                 profile_p = np.concatenate(
@@ -1367,6 +1630,7 @@ def calculate_dcape_grid(
                     ]
                 )
 
+
                 profile_t = np.concatenate(
                     [
                         [ts],
@@ -1374,12 +1638,14 @@ def calculate_dcape_grid(
                     ]
                 )
 
+
                 profile_td = np.concatenate(
                     [
                         [tds],
                         td_valid
                     ]
                 )
+
 
                 # ------------------------------------------------
                 # SORT HIGH -> LOW PRESSURE
@@ -1389,20 +1655,24 @@ def calculate_dcape_grid(
                     profile_p
                 )[::-1]
 
+
                 profile_p = profile_p[
                     order
                 ]
+
 
                 profile_t = profile_t[
                     order
                 ]
 
+
                 profile_td = profile_td[
                     order
                 ]
 
+
                 # ------------------------------------------------
-                # REMOVE DUPLICATE PRESSURE LEVELS
+                # REMOVE DUPLICATES
                 # ------------------------------------------------
 
                 _, unique_index = np.unique(
@@ -1410,21 +1680,26 @@ def calculate_dcape_grid(
                     return_index=True
                 )
 
+
                 unique_index = np.sort(
                     unique_index
                 )
+
 
                 profile_p = profile_p[
                     unique_index
                 ]
 
+
                 profile_t = profile_t[
                     unique_index
                 ]
 
+
                 profile_td = profile_td[
                     unique_index
                 ]
+
 
                 # ------------------------------------------------
                 # METPY UNITS
@@ -1436,11 +1711,13 @@ def calculate_dcape_grid(
                     units.hPa
                 )
 
+
                 T_q = (
                     profile_t
                     *
                     units.kelvin
                 )
+
 
                 Td_q = (
                     profile_td
@@ -1448,27 +1725,35 @@ def calculate_dcape_grid(
                     units.kelvin
                 )
 
+
                 # ------------------------------------------------
                 # DCAPE
                 # ------------------------------------------------
 
-                result = mpcalc.downdraft_cape(
-                    p_q,
-                    T_q,
-                    Td_q
+                result = (
+                    mpcalc.downdraft_cape(
+                        p_q,
+                        T_q,
+                        Td_q
+                    )
                 )
 
-                dcape_q = (
-                    result[0]
-                )
+
+                dcape_q = result[0]
+
 
                 value = float(
+
                     dcape_q
+
                     .to(
                         "joule / kilogram"
                     )
+
                     .magnitude
+
                 )
+
 
                 if np.isfinite(
                     value
@@ -1482,9 +1767,11 @@ def calculate_dcape_grid(
                         0.0
                     )
 
+
             except Exception:
 
                 continue
+
 
     # ========================================================
     # SMOOTH DCAPE
@@ -1499,20 +1786,24 @@ def calculate_dcape_grid(
         )
     )
 
+
     dcape_filled = np.nan_to_num(
         dcape,
         nan=0.0
     )
+
 
     smoothed_data = gaussian_filter(
         dcape_filled,
         sigma=DCAPE_SMOOTH_SIGMA
     )
 
+
     smoothed_weight = gaussian_filter(
         valid_mask,
         sigma=DCAPE_SMOOTH_SIGMA
     )
+
 
     with np.errstate(
         divide="ignore",
@@ -1525,9 +1816,11 @@ def calculate_dcape_grid(
             smoothed_weight
         )
 
+
     dcape_smooth[
         smoothed_weight < 0.05
     ] = np.nan
+
 
     if np.any(
         np.isfinite(
@@ -1540,6 +1833,7 @@ def calculate_dcape_grid(
             f"{np.nanmax(dcape_smooth):.0f} "
             "J/kg"
         )
+
 
     return (
         lon_dcape,
@@ -1556,6 +1850,7 @@ cycle_date, cycle_hour = (
     find_latest_hrrr_cycle()
 )
 
+
 cycle_str = (
     f"{cycle_date}_"
     f"{cycle_hour:02d}z"
@@ -1563,7 +1858,7 @@ cycle_str = (
 
 
 # ============================================================
-# MAX FORECAST HOUR
+# FORECAST LENGTH
 # ============================================================
 
 if cycle_hour in [
@@ -1591,10 +1886,11 @@ PRODUCT_PATH = (
 
 
 # ============================================================
-# LOAD EXISTING RUNS.JSON
+# EXISTING RUNS.JSON
 # ============================================================
 
 old_runs = []
+
 
 try:
 
@@ -1602,6 +1898,7 @@ try:
         Bucket=BUCKET,
         Key=f"{PRODUCT_PATH}/runs.json"
     )
+
 
     old_data = json.loads(
         obj[
@@ -1613,10 +1910,12 @@ try:
         )
     )
 
+
     old_runs = old_data.get(
         "runs",
         []
     )
+
 
 except Exception:
 
@@ -1624,10 +1923,11 @@ except Exception:
 
 
 # ============================================================
-# BUILD NEW RUN
+# BUILD NEW RUN ENTRY
 # ============================================================
 
 new_run = {
+
     "id":
         cycle_str,
 
@@ -1641,6 +1941,7 @@ new_run = {
 
     "max_fhr":
         MAX_FHR
+
 }
 
 
@@ -1658,16 +1959,21 @@ for r in old_runs:
 
         rid = r
 
+
         rhour = int(
+
             rid
             .split("_")[1]
             .replace(
                 "z",
                 ""
             )
+
         )
 
+
         combined.append({
+
             "id":
                 rid,
 
@@ -1689,7 +1995,9 @@ for r in old_runs:
                     else
                     18
                 )
+
         })
+
 
     elif (
         r.get("id")
@@ -1798,6 +2106,7 @@ def load_hrrr_fields_once(
         "=" * 70
     )
 
+
     print(
         f"Loading HRRR Gust/DCAPE | "
         f"HRRR {cycle_date} "
@@ -1805,12 +2114,14 @@ def load_hrrr_fields_once(
         f"F{fhr:03d}"
     )
 
+
     print(
         "=" * 70
     )
 
+
     # ========================================================
-    # GUST
+    # SURFACE GUST
     # ========================================================
 
     gust_da = hrrr_field(
@@ -1822,18 +2133,22 @@ def load_hrrr_fields_once(
         "surface wind gust"
     )
 
+
     lat, lon = get_lat_lon(
         gust_da
     )
+
 
     gust_ms = np.asarray(
         gust_da.values,
         dtype=float
     )
 
+
     gust_mph = ms_to_mph(
         gust_ms
     )
+
 
     # ========================================================
     # 10-M U WIND
@@ -1848,6 +2163,7 @@ def load_hrrr_fields_once(
         "10-m U wind"
     )
 
+
     # ========================================================
     # 10-M V WIND
     # ========================================================
@@ -1861,15 +2177,18 @@ def load_hrrr_fields_once(
         "10-m V wind"
     )
 
+
     u10 = np.asarray(
         u10_da.values,
         dtype=float
     )
 
+
     v10 = np.asarray(
         v10_da.values,
         dtype=float
     )
+
 
     # ========================================================
     # SURFACE PRESSURE
@@ -1884,10 +2203,12 @@ def load_hrrr_fields_once(
         "surface pressure"
     )
 
+
     psfc = np.asarray(
         ps_da.values,
         dtype=float
     )
+
 
     # ========================================================
     # 2-M TEMPERATURE
@@ -1902,10 +2223,12 @@ def load_hrrr_fields_once(
         "2-m temperature"
     )
 
+
     t2 = np.asarray(
         t2_da.values,
         dtype=float
     )
+
 
     # ========================================================
     # 2-M DEWPOINT
@@ -1920,10 +2243,12 @@ def load_hrrr_fields_once(
         "2-m dewpoint"
     )
 
+
     td2 = np.asarray(
         td2_da.values,
         dtype=float
     )
+
 
     # ========================================================
     # PRESSURE-LEVEL TEMPERATURE
@@ -1938,6 +2263,7 @@ def load_hrrr_fields_once(
         "pressure-level temperature"
     )
 
+
     # ========================================================
     # PRESSURE-LEVEL DEWPOINT
     # ========================================================
@@ -1951,8 +2277,9 @@ def load_hrrr_fields_once(
         "pressure-level dewpoint"
     )
 
+
     # ========================================================
-    # REGIONAL DCAPE
+    # CALCULATE REGIONAL DCAPE
     # ========================================================
 
     regional_extent = (
@@ -1962,6 +2289,7 @@ def load_hrrr_fields_once(
             "extent"
         ]
     )
+
 
     (
         dcape_lon,
@@ -1980,7 +2308,9 @@ def load_hrrr_fields_once(
         stride=DCAPE_STRIDE
     )
 
+
     return {
+
         "lat":
             lat,
 
@@ -2004,6 +2334,7 @@ def load_hrrr_fields_once(
 
         "dcape":
             dcape,
+
     }
 
 
@@ -2020,6 +2351,7 @@ def plot_domain_from_fields(
 
     global LON_MIN, LON_MAX, LAT_MIN, LAT_MAX
 
+
     (
         LON_MIN,
         LON_MAX,
@@ -2030,15 +2362,18 @@ def plot_domain_from_fields(
         "extent"
     ]
 
+
     domain_outdir = os.path.join(
         OUTDIR,
         domain_key
     )
 
+
     os.makedirs(
         domain_outdir,
         exist_ok=True
     )
+
 
     print(
         f"Plotting "
@@ -2046,39 +2381,48 @@ def plot_domain_from_fields(
         f"F{fhr:03d}"
     )
 
+
     try:
 
         lat = fields[
             "lat"
         ]
 
+
         lon = fields[
             "lon"
         ]
+
 
         gust_mph = fields[
             "gust_mph"
         ]
 
+
         u10 = fields[
             "u10"
         ]
+
 
         v10 = fields[
             "v10"
         ]
 
+
         dcape_lon = fields[
             "dcape_lon"
         ]
+
 
         dcape_lat = fields[
             "dcape_lat"
         ]
 
+
         dcape = fields[
             "dcape"
         ]
+
 
         # ====================================================
         # SUBSET DOMAIN
@@ -2093,30 +2437,36 @@ def plot_domain_from_fields(
             padding=2
         )
 
+
         lat_sub = lat[
             ys,
             xs
         ]
+
 
         lon_sub = lon[
             ys,
             xs
         ]
 
+
         gust_sub = gust_mph[
             ys,
             xs
         ]
+
 
         u10_sub = u10[
             ys,
             xs
         ]
 
+
         v10_sub = v10[
             ys,
             xs
         ]
+
 
         # ====================================================
         # MASK GUSTS BELOW 15 MPH
@@ -2127,8 +2477,9 @@ def plot_domain_from_fields(
             MIN_GUST_MPH
         )
 
+
         # ====================================================
-        # MAXIMUM DISPLAYED-DOMAIN GUST
+        # MAXIMUM GUST
         # ====================================================
 
         max_gust = float(
@@ -2137,10 +2488,12 @@ def plot_domain_from_fields(
             )
         )
 
+
         print(
             f"Regional max gust: "
             f"{max_gust:.1f} mph"
         )
+
 
         # ====================================================
         # FIGURE
@@ -2150,9 +2503,11 @@ def plot_domain_from_fields(
             "all"
         )
 
+
         plt.rcParams[
             "contour.negative_linestyle"
         ] = "solid"
+
 
         fig = plt.figure(
             figsize=(
@@ -2161,10 +2516,12 @@ def plot_domain_from_fields(
             )
         )
 
+
         ax = plt.axes(
             projection=
                 ccrs.PlateCarree()
         )
+
 
         ax.set_extent(
             cfg[
@@ -2174,6 +2531,7 @@ def plot_domain_from_fields(
                 ccrs.PlateCarree()
         )
 
+
         ax.add_feature(
             cfeature.LAND,
             facecolor=
@@ -2181,6 +2539,7 @@ def plot_domain_from_fields(
             zorder=
                 0
         )
+
 
         # ====================================================
         # GUST FILL
@@ -2210,8 +2569,98 @@ def plot_domain_from_fields(
                 3
         )
 
+
         # ====================================================
-        # DCAPE
+        # STATE / COUNTY BORDERS
+        #
+        # DRAW THESE BEFORE DCAPE + BARBS SO METEOROLOGICAL
+        # FIELDS REMAIN ABOVE THEM.
+        # ====================================================
+
+        add_shapefile_outline(
+            ax,
+            STATE_SHP,
+            edgecolor="black",
+            linewidth=1.4,
+            zorder=12
+        )
+
+
+        add_shapefile_outline(
+            ax,
+            COUNTY_SHP,
+            edgecolor="lightgray",
+            linewidth=0.35,
+            zorder=11
+        )
+
+
+        # ====================================================
+        # LBF CWA COUNTIES
+        # ====================================================
+
+        add_counties_clipped_to_cwa(
+            ax,
+            COUNTY_SHP,
+            lbf_geom,
+            lw=1.0,
+            color="black",
+            zorder=13
+        )
+
+
+        # ====================================================
+        # LBF CWA OUTLINE
+        # ====================================================
+
+        ax.add_geometries(
+            [
+                lbf_geom
+            ],
+
+            crs=
+                ccrs.PlateCarree(),
+
+            facecolor=
+                "none",
+
+            edgecolor=
+                "black",
+
+            linewidth=
+                3.5,
+
+            zorder=
+                14
+        )
+
+
+        ax.add_geometries(
+            [
+                lbf_geom
+            ],
+
+            crs=
+                ccrs.PlateCarree(),
+
+            facecolor=
+                "none",
+
+            edgecolor=
+                "white",
+
+            linewidth=
+                1.8,
+
+            zorder=
+                15
+        )
+
+
+        # ====================================================
+        # DCAPE CONTOURS
+        #
+        # ABOVE STATES / COUNTIES / CWA
         # ====================================================
 
         if np.any(
@@ -2221,13 +2670,14 @@ def plot_domain_from_fields(
         ):
 
             # ------------------------------------------------
-            # WHITE HALO UNDER CONTOURS
+            # THINNER WHITE HALO
             # ------------------------------------------------
 
             halo_widths = [
-                width + 1.3
+                width + 0.7
                 for width in DCAPE_WIDTHS
             ]
+
 
             ax.contour(
                 dcape_lon,
@@ -2244,7 +2694,7 @@ def plot_domain_from_fields(
                     halo_widths,
 
                 alpha=
-                    0.72,
+                    0.55,
 
                 transform=
                     ccrs.PlateCarree(),
@@ -2253,8 +2703,9 @@ def plot_domain_from_fields(
                     20
             )
 
+
             # ------------------------------------------------
-            # COLORED DCAPE
+            # THIN COLORED DCAPE CONTOURS
             # ------------------------------------------------
 
             dc = ax.contour(
@@ -2278,8 +2729,9 @@ def plot_domain_from_fields(
                     21
             )
 
+
             # ------------------------------------------------
-            # LABEL ALL 100 J/KG CONTOURS
+            # LABEL EVERY AVAILABLE 100 J/KG CONTOUR
             # ------------------------------------------------
 
             labels = ax.clabel(
@@ -2302,24 +2754,36 @@ def plot_domain_from_fields(
                     7.2
             )
 
+
             for label in labels:
 
                 label.set_fontweight(
                     "bold"
                 )
 
+
+                label.set_zorder(
+                    23
+                )
+
+
                 label.set_path_effects([
+
                     pe.withStroke(
                         linewidth=
-                            2.3,
+                            2.1,
 
                         foreground=
                             "white"
                     )
+
                 ])
+
 
         # ====================================================
         # 10-M WIND BARBS
+        #
+        # ABOVE EVERYTHING EXCEPT TEXT / LABELS
         # ====================================================
 
         if PLOT_10M_WIND_BARBS:
@@ -2328,6 +2792,7 @@ def plot_domain_from_fields(
                 "barb_skip",
                 20
             )
+
 
             ax.barbs(
                 lon_sub[
@@ -2376,84 +2841,6 @@ def plot_domain_from_fields(
                     22
             )
 
-        # ====================================================
-        # STATE / COUNTY BORDERS
-        # ====================================================
-
-        add_shapefile_outline(
-            ax,
-            STATE_SHP,
-            edgecolor="black",
-            linewidth=1.4,
-            zorder=13
-        )
-
-        add_shapefile_outline(
-            ax,
-            COUNTY_SHP,
-            edgecolor="lightgray",
-            linewidth=0.35,
-            zorder=12
-        )
-
-        # ====================================================
-        # LBF COUNTIES
-        # ====================================================
-
-        add_counties_clipped_to_cwa(
-            ax,
-            COUNTY_SHP,
-            lbf_geom,
-            lw=1.0,
-            color="black",
-            zorder=13
-        )
-
-        # ====================================================
-        # LBF CWA OUTLINE
-        # ====================================================
-
-        ax.add_geometries(
-            [
-                lbf_geom
-            ],
-
-            crs=
-                ccrs.PlateCarree(),
-
-            facecolor=
-                "none",
-
-            edgecolor=
-                "black",
-
-            linewidth=
-                3.5,
-
-            zorder=
-                14
-        )
-
-        ax.add_geometries(
-            [
-                lbf_geom
-            ],
-
-            crs=
-                ccrs.PlateCarree(),
-
-            facecolor=
-                "none",
-
-            edgecolor=
-                "white",
-
-            linewidth=
-                1.8,
-
-            zorder=
-                15
-        )
 
         # ====================================================
         # CITY LABELS
@@ -2468,8 +2855,9 @@ def plot_domain_from_fields(
                 fontsize=9
             )
 
+
         # ====================================================
-        # TIME
+        # TIMES
         # ====================================================
 
         init_dt = datetime.strptime(
@@ -2478,6 +2866,7 @@ def plot_domain_from_fields(
             "%Y%m%d%H"
         )
 
+
         valid_dt = (
             init_dt
             +
@@ -2485,6 +2874,7 @@ def plot_domain_from_fields(
                 hours=fhr
             )
         )
+
 
         # ====================================================
         # TITLES
@@ -2495,16 +2885,19 @@ def plot_domain_from_fields(
             "DCAPE & 10-m Wind"
         )
 
+
         valid_title = (
             f"F{fhr:03d} Valid: "
             f"{valid_dt:%a %Y-%m-%d %Hz}"
         )
+
 
         init_title = (
             f"Init: "
             f"{init_dt:%a %Y-%m-%d %Hz} "
             "HRRR"
         )
+
 
         ax.text(
             0.0,
@@ -2529,6 +2922,7 @@ def plot_domain_from_fields(
                 "bold"
         )
 
+
         ax.text(
             0.0,
             1.005,
@@ -2551,6 +2945,7 @@ def plot_domain_from_fields(
             fontweight=
                 "bold"
         )
+
 
         ax.text(
             1.0,
@@ -2575,10 +2970,11 @@ def plot_domain_from_fields(
                 "bold"
         )
 
+
         # ====================================================
         # MAX GUST BOX
         #
-        # NO STAR / NO LOCATION MARKER
+        # NO STAR / NO MAP LOCATION MARKER
         # ====================================================
 
         ax.text(
@@ -2607,6 +3003,7 @@ def plot_domain_from_fields(
                 "black",
 
             bbox=dict(
+
                 boxstyle=
                     "round,pad=0.35",
 
@@ -2621,11 +3018,13 @@ def plot_domain_from_fields(
 
                 alpha=
                     0.90
+
             ),
 
             zorder=
                 50
         )
+
 
         # ====================================================
         # COLORBAR
@@ -2635,9 +3034,11 @@ def plot_domain_from_fields(
             make_axes_locatable
         )
 
+
         divider = make_axes_locatable(
             ax
         )
+
 
         cax = divider.append_axes(
             "bottom",
@@ -2645,6 +3046,7 @@ def plot_domain_from_fields(
             pad=0.25,
             axes_class=plt.Axes
         )
+
 
         cbar = plt.colorbar(
             pm,
@@ -2669,21 +3071,25 @@ def plot_domain_from_fields(
             drawedges=False
         )
 
+
         cbar.set_label(
             "Surface Wind Gust (mph)",
             fontsize=10,
             weight="bold"
         )
 
+
         cbar.ax.xaxis.set_label_position(
             "top"
         )
+
 
         cbar.ax.tick_params(
             axis="x",
             which="both",
             length=0
         )
+
 
         # ====================================================
         # LOGO
@@ -2696,6 +3102,7 @@ def plot_domain_from_fields(
             logo = mpimg.imread(
                 LOGO_PATH
             )
+
 
             logo_ax = ax.inset_axes(
                 [
@@ -2712,13 +3119,16 @@ def plot_domain_from_fields(
                     50
             )
 
+
             logo_ax.imshow(
                 logo
             )
 
+
             logo_ax.axis(
                 "off"
             )
+
 
         # ====================================================
         # OFFICE LABEL
@@ -2752,6 +3162,7 @@ def plot_domain_from_fields(
                 51,
 
             path_effects=[
+
                 pe.withStroke(
                     linewidth=
                         2.5,
@@ -2759,11 +3170,15 @@ def plot_domain_from_fields(
                     foreground=
                         "white"
                 )
+
             ]
         )
 
+
         # ====================================================
         # CREATOR CREDIT
+        #
+        # KEEP BOTTOM-LEFT TEXT
         # ====================================================
 
         ax.text(
@@ -2794,6 +3209,7 @@ def plot_domain_from_fields(
                 40,
 
             path_effects=[
+
                 pe.withStroke(
                     linewidth=
                         2.5,
@@ -2801,8 +3217,18 @@ def plot_domain_from_fields(
                     foreground=
                         "white"
                 )
+
             ]
         )
+
+
+        # ====================================================
+        # NOTE:
+        #
+        # NO BOTTOM-MIDDLE
+        # "Contours: DCAPE | Barbs..."
+        # TEXT ANYMORE.
+        # ====================================================
 
 
         # ====================================================
@@ -2814,24 +3240,29 @@ def plot_domain_from_fields(
             f"hrrr_gust_dcape_f{fhr:03d}.png"
         )
 
+
         plt.savefig(
             outname,
             dpi=140,
             bbox_inches="tight"
         )
 
+
         plt.close(
             fig
         )
+
 
         print(
             "Saved:",
             outname
         )
 
+
         filename = os.path.basename(
             outname
         )
+
 
         # ====================================================
         # UPLOAD
@@ -2844,10 +3275,12 @@ def plot_domain_from_fields(
             f"{filename}"
         )
 
+
         upload_to_r2(
             outname,
             remote_key
         )
+
 
     except Exception as e:
 
@@ -2879,6 +3312,7 @@ for fhr in fhrs:
 
     fhr_success = False
 
+
     for attempt in range(
         1,
         MAX_FHR_ATTEMPTS + 1
@@ -2892,6 +3326,7 @@ for fhr in fhrs:
                 "=" * 70
             )
 
+
             print(
                 f"Processing HRRR "
                 f"F{fhr:03d} | "
@@ -2900,13 +3335,16 @@ for fhr in fhrs:
                 f"{MAX_FHR_ATTEMPTS}"
             )
 
+
             print(
                 "=" * 70
             )
 
+
             fields = load_hrrr_fields_once(
                 fhr
             )
+
 
             for (
                 domain_key,
@@ -2921,18 +3359,23 @@ for fhr in fhrs:
                     fhr
                 )
 
+
             fhr_success = True
+
 
             successful_fhrs.append(
                 fhr
             )
+
 
             print(
                 f"Successfully completed "
                 f"HRRR F{fhr:03d}"
             )
 
+
             break
+
 
         except Exception as e:
 
@@ -2943,6 +3386,7 @@ for fhr in fhrs:
                 f"{MAX_FHR_ATTEMPTS}: "
                 f"{e}"
             )
+
 
             if (
                 attempt
@@ -2957,15 +3401,18 @@ for fhr in fhrs:
                     f"F{fhr:03d}..."
                 )
 
+
                 time.sleep(
                     RETRY_WAIT_SECONDS
                 )
+
 
     if not fhr_success:
 
         failed_fhrs.append(
             fhr
         )
+
 
         print(
             f"Skipping HRRR "
@@ -2985,13 +3432,16 @@ print(
     "=" * 70
 )
 
+
 print(
     "HRRR GUST/DCAPE PROCESSING SUMMARY"
 )
 
+
 print(
     "=" * 70
 )
+
 
 print(
     "Successful forecast hours:",
@@ -3000,6 +3450,7 @@ print(
         for fhr in successful_fhrs
     ]
 )
+
 
 print(
     "Failed forecast hours:",
