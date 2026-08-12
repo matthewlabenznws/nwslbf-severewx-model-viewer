@@ -2250,7 +2250,7 @@ def plot_domain_from_fields(
                     ccrs.PlateCarree(),
 
                 zorder=
-                    6
+                    20
             )
 
             # ------------------------------------------------
@@ -2275,7 +2275,7 @@ def plot_domain_from_fields(
                     ccrs.PlateCarree(),
 
                 zorder=
-                    7
+                    21
             )
 
             # ------------------------------------------------
@@ -2373,7 +2373,7 @@ def plot_domain_from_fields(
                     ccrs.PlateCarree(),
 
                 zorder=
-                    10
+                    22
             )
 
         # ====================================================
