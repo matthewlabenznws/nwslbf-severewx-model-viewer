@@ -2679,29 +2679,16 @@ def plot_domain_from_fields(
             ]
 
 
-            ax.contour(
+            dc = ax.contour(
                 dcape_lon,
                 dcape_lat,
                 dcape,
-
-                levels=
-                    DCAPE_LEVELS,
-
-                colors=
-                    "white",
-
-                linewidths=
-                    halo_widths,
-
-                alpha=
-                    0.55,
-
-                transform=
-                    ccrs.PlateCarree(),
-
-                zorder=
-                    20
-            )
+                levels=DCAPE_LEVELS,
+                colors=DCAPE_COLORS,
+                linewidths=DCAPE_WIDTHS,
+                transform=ccrs.PlateCarree(),
+                zorder=21
+                )
 
 
             # ------------------------------------------------
@@ -2771,11 +2758,7 @@ def plot_domain_from_fields(
 
                     pe.withStroke(
                         linewidth=
-                            2.1,
-
-                        foreground=
-                            "white"
-                    )
+                            2.1)
 
                 ])
 
