@@ -1,10 +1,14 @@
 <!DOCTYPE html>
 <html>
+
 <head>
+
   <meta charset="utf-8">
+
   <title>CAMs Viewer</title>
 
   <style>
+
     body {
       margin: 0;
       background: linear-gradient(to bottom, #111 0%, #080808 100%);
@@ -13,7 +17,8 @@
       text-align: center;
     }
 
-    .navbar, .subbar {
+    .navbar,
+    .subbar {
       text-align: left;
       font-weight: bold;
       border-bottom: 1px solid #333;
@@ -31,19 +36,22 @@
       font-size: 16px;
     }
 
-    .navbar a, .subbar a {
+    .navbar a,
+    .subbar a {
       color: white;
       text-decoration: none;
       margin: 0 8px;
       transition: 0.2s ease;
     }
 
-    .navbar a:hover, .subbar a:hover {
+    .navbar a:hover,
+    .subbar a:hover {
       color: #6ea8ff;
       text-shadow: 0 0 10px rgba(110,168,255,0.35);
     }
 
-    .navbar span, .subbar span {
+    .navbar span,
+    .subbar span {
       color: #777;
     }
 
@@ -58,7 +66,8 @@
       gap: 14px;
     }
 
-    select, button {
+    select,
+    button {
       background: #2c2c2c;
       color: white;
       border: 1px solid #555;
@@ -68,7 +77,8 @@
       transition: 0.2s ease;
     }
 
-    select:hover, button:hover {
+    select:hover,
+    button:hover {
       border-color: #6ea8ff;
       box-shadow: 0 0 10px rgba(110,168,255,0.2);
     }
@@ -269,6 +279,7 @@
     }
 
     @media (max-width: 700px) {
+
       .navbar {
         font-size: 18px;
       }
@@ -309,692 +320,3936 @@
         width: 100%;
         max-width: 96vw;
       }
+
     }
+
   </style>
+
 </head>
+
 
 <body>
 
+
 <div class="navbar">
+
   <a href="index.html">HOME</a>
+
   <span>/</span>
+
   <a href="cams.html?model=hrrr">CAMs</a>
+
   <span>/</span>
+
   <a href="mesoensprob.html">MESO-ENS PROB</a>
+
 </div>
+
 
 <div class="subbar">
+
   <a href="cams.html?model=hrrr">HRRR</a>
+
   <span>/</span>
+
   <a href="cams.html?model=rrfs">RRFS</a>
+
   <span>/</span>
+
   <a href="cams.html?model=refs&member=m01">REFS MEM01-05</a>
+
 </div>
 
+
 <div class="topbar">
+
   <b id="viewerTitle">HRRR Reflectivity/UH</b>
 
+
   <label>View:</label>
+
   <select id="viewSelect" onchange="changeView()">
-    <option value="single">Single Panel</option>
-    <option value="compare_products">Compare Products</option>
-    <option value="compare_models">Compare Models</option>
+
+    <option value="single">
+      Single Panel
+    </option>
+
+    <option value="compare_products">
+      Compare Products
+    </option>
+
+    <option value="compare_models">
+      Compare Models
+    </option>
+
   </select>
 
-  <label id="leftModelLabel">Model:</label>
+
+  <label id="leftModelLabel">
+    Model:
+  </label>
+
   <select id="modelSelect" onchange="changeModel()">
-    <option value="hrrr">HRRR</option>
-    <option value="rrfs">RRFS</option>
-    <option value="refs">REFS</option>
+
+    <option value="hrrr">
+      HRRR
+    </option>
+
+    <option value="rrfs">
+      RRFS
+    </option>
+
+    <option value="refs">
+      REFS
+    </option>
+
   </select>
+
 
   <span id="memberBlock">
-    <label>Member:</label>
+
+    <label>
+      Member:
+    </label>
+
     <select id="memberSelect" onchange="changeMember()">
+
       <option value="m01">M01</option>
       <option value="m02">M02</option>
       <option value="m03">M03</option>
       <option value="m04">M04</option>
       <option value="m05">M05</option>
+
     </select>
+
   </span>
 
-  <label id="leftProductLabel">Product:</label>
-  <select id="leftProductSelect" onchange="changeLeftProduct()"></select>
+
+  <label id="leftProductLabel">
+    Product:
+  </label>
+
+  <select
+    id="leftProductSelect"
+    onchange="changeLeftProduct()">
+  </select>
+
 
   <span id="rightProductBlock">
+
+
     <span id="rightModelBlock">
-      <label>Right Model:</label>
-      <select id="rightModelSelect" onchange="changeRightModel()">
-        <option value="hrrr">HRRR</option>
-        <option value="rrfs">RRFS</option>
-        <option value="refs">REFS</option>
+
+      <label>
+        Right Model:
+      </label>
+
+      <select
+        id="rightModelSelect"
+        onchange="changeRightModel()">
+
+        <option value="hrrr">
+          HRRR
+        </option>
+
+        <option value="rrfs">
+          RRFS
+        </option>
+
+        <option value="refs">
+          REFS
+        </option>
+
       </select>
+
     </span>
 
+
     <span id="rightMemberBlock">
-      <label>Member:</label>
-      <select id="rightMemberSelect" onchange="changeRightMember()">
+
+      <label>
+        Member:
+      </label>
+
+      <select
+        id="rightMemberSelect"
+        onchange="changeRightMember()">
+
         <option value="m01">M01</option>
         <option value="m02">M02</option>
         <option value="m03">M03</option>
         <option value="m04">M04</option>
         <option value="m05">M05</option>
+
       </select>
+
     </span>
 
-    <label>Right Product:</label>
-    <select id="rightProductSelect" onchange="changeRightProduct()"></select>
+
+    <label>
+      Right Product:
+    </label>
+
+    <select
+      id="rightProductSelect"
+      onchange="changeRightProduct()">
+    </select>
+
   </span>
 
-  <label>Run:</label>
-  <select id="runSelect" onchange="changeRun()"></select>
 
-  <label>Domain:</label>
-  <select id="domainSelect" onchange="changeDomain()">
-    <option value="regional">Regional</option>
-    <option value="lbf">LBF</option>
-    <option value="central_plains">Central Plains</option>
-    <option value="spc_severe">SPC Severe</option>
-  </select>
-</div>
-
-<div class="controls">
-  <button onclick="togglePlay()" id="playBtn">▶ Play</button>
-  <button onclick="latestRun()">Latest</button>
-  <input id="slider" type="range" min="0" max="48" value="0">
-  <div id="fhrLabel">000</div>
-</div>
-
-<div class="save-controls">
-  <button onclick="savePNG()" id="savePngBtn">Save PNG</button>
-
-  <label>GIF Start:</label>
-  <div class="gif-range">
-    <input id="gifStart" type="range" min="0" max="48" value="0">
-    <span class="range-value" id="gifStartLabel">F000</span>
-  </div>
-
-  <label>GIF End:</label>
-  <div class="gif-range">
-    <input id="gifEnd" type="range" min="0" max="48" value="48">
-    <span class="range-value" id="gifEndLabel">F048</span>
-  </div>
-
-  <label>Speed:</label>
-  <select id="gifDelay">
-    <option value="250">Fast</option>
-    <option value="450" selected>Normal</option>
-    <option value="700">Slow</option>
-  </select>
-
-  <label class="loop-option">
-    <input id="gifLoop" type="checkbox" checked>
-    Loop forever
+  <label>
+    Run:
   </label>
 
-  <button onclick="saveGIF()" id="saveGifBtn">Save GIF</button>
+  <select
+    id="runSelect"
+    onchange="changeRun()">
+  </select>
+
+
+  <label>
+    Domain:
+  </label>
+
+  <select
+    id="domainSelect"
+    onchange="changeDomain()">
+
+    <option value="regional">
+      Regional
+    </option>
+
+    <option value="lbf">
+      LBF
+    </option>
+
+    <option value="central_plains">
+      Central Plains
+    </option>
+
+    <option value="spc_severe">
+      SPC Severe
+    </option>
+
+  </select>
+
+
+</div>
+
+
+<div class="controls">
+
+  <button
+    onclick="togglePlay()"
+    id="playBtn">
+
+    ▶ Play
+
+  </button>
+
+
+  <button onclick="latestRun()">
+
+    Latest
+
+  </button>
+
+
+  <input
+    id="slider"
+    type="range"
+    min="0"
+    max="48"
+    value="0">
+
+
+  <div id="fhrLabel">
+    000
+  </div>
+
+</div>
+
+
+<div class="save-controls">
+
+  <button
+    onclick="savePNG()"
+    id="savePngBtn">
+
+    Save PNG
+
+  </button>
+
+
+  <label>
+    GIF Start:
+  </label>
+
+
+  <div class="gif-range">
+
+    <input
+      id="gifStart"
+      type="range"
+      min="0"
+      max="48"
+      value="0">
+
+    <span
+      class="range-value"
+      id="gifStartLabel">
+
+      F000
+
+    </span>
+
+  </div>
+
+
+  <label>
+    GIF End:
+  </label>
+
+
+  <div class="gif-range">
+
+    <input
+      id="gifEnd"
+      type="range"
+      min="0"
+      max="48"
+      value="48">
+
+    <span
+      class="range-value"
+      id="gifEndLabel">
+
+      F048
+
+    </span>
+
+  </div>
+
+
+  <label>
+    Speed:
+  </label>
+
+
+  <select id="gifDelay">
+
+    <option value="250">
+      Fast
+    </option>
+
+    <option
+      value="450"
+      selected>
+
+      Normal
+
+    </option>
+
+    <option value="700">
+      Slow
+    </option>
+
+  </select>
+
+
+  <label class="loop-option">
+
+    <input
+      id="gifLoop"
+      type="checkbox"
+      checked>
+
+    Loop forever
+
+  </label>
+
+
+  <button
+    onclick="saveGIF()"
+    id="saveGifBtn">
+
+    Save GIF
+
+  </button>
+
+
   <span id="saveStatus"></span>
+
 </div>
 
-<div class="tiles" id="tiles"></div>
 
-<div class="plot-wrap" id="plotWrap">
+<div
+  class="tiles"
+  id="tiles">
+</div>
+
+
+<div
+  class="plot-wrap"
+  id="plotWrap">
+
+
   <div class="plot-panel">
-    <div class="panel-title" id="leftPanelTitle"></div>
-    <img class="plot-image" id="leftPlot" src="" alt="Left model plot">
+
+    <div
+      class="panel-title"
+      id="leftPanelTitle">
+    </div>
+
+    <img
+      class="plot-image"
+      id="leftPlot"
+      src=""
+      alt="Left model plot">
+
   </div>
 
-  <div class="plot-panel" id="rightPanel">
-    <div class="panel-title" id="rightPanelTitle"></div>
-    <img class="plot-image" id="rightPlot" src="" alt="Right model plot">
+
+  <div
+    class="plot-panel"
+    id="rightPanel">
+
+    <div
+      class="panel-title"
+      id="rightPanelTitle">
+    </div>
+
+    <img
+      class="plot-image"
+      id="rightPlot"
+      src=""
+      alt="Right model plot">
+
   </div>
+
+
 </div>
+
 
 <div class="footer">
-  Developed by Matthew Labenz<br>
+
+  Developed by Matthew Labenz
+  <br>
+
   NWS North Platte, Nebraska
+
 </div>
 
-<script src="assets/gif.js"></script>
-<script>
-const BASE_URL = "https://mtl-nwslbf-model-data.s3.us-east-2.amazonaws.com";
-const params = new URLSearchParams(window.location.search);
 
-let selectedView = params.get("view") || "single";
-let selectedModel = params.get("model") || "hrrr";
-let selectedMember = params.get("member") || "m01";
-let leftProduct = params.get("product") || "refl_uh";
-let rightModel = params.get("rightModel") || "rrfs";
-let rightMember = params.get("rightMember") || "m01";
-let rightProduct = params.get("rightProduct") || "refl_uh";
+<script src="assets/gif.js"></script>
+
+
+<script>
+
+
+const BASE_URL =
+  "https://mtl-nwslbf-model-data.s3.us-east-2.amazonaws.com";
+
+
+const params =
+  new URLSearchParams(
+    window.location.search
+  );
+
+
+let selectedView =
+  params.get("view")
+  ||
+  "single";
+
+
+let selectedModel =
+  params.get("model")
+  ||
+  "hrrr";
+
+
+let selectedMember =
+  params.get("member")
+  ||
+  "m01";
+
+
+let leftProduct =
+  params.get("product")
+  ||
+  "refl_uh";
+
+
+let rightModel =
+  params.get("rightModel")
+  ||
+  "rrfs";
+
+
+let rightMember =
+  params.get("rightMember")
+  ||
+  "m01";
+
+
+let rightProduct =
+  params.get("rightProduct")
+  ||
+  "refl_uh";
+
+
 let selectedRun = "";
+
 let selectedDomain = "regional";
+
 let current = 0;
+
 let maxFhr = 18;
+
 let availableFrames = [];
+
 let playing = false;
+
 let timer = null;
+
 let runs = [];
+
 let leftRuns = [];
+
 let rightRuns = [];
+
 let creatingGif = false;
 
-const viewSelect = document.getElementById("viewSelect");
-const modelSelect = document.getElementById("modelSelect");
-const memberSelect = document.getElementById("memberSelect");
-const memberBlock = document.getElementById("memberBlock");
-const leftProductSelect = document.getElementById("leftProductSelect");
-const rightProductSelect = document.getElementById("rightProductSelect");
-const rightProductBlock = document.getElementById("rightProductBlock");
-const rightModelBlock = document.getElementById("rightModelBlock");
-const rightModelSelect = document.getElementById("rightModelSelect");
-const rightMemberBlock = document.getElementById("rightMemberBlock");
-const rightMemberSelect = document.getElementById("rightMemberSelect");
-const leftModelLabel = document.getElementById("leftModelLabel");
-const leftProductLabel = document.getElementById("leftProductLabel");
-const runSelect = document.getElementById("runSelect");
-const domainSelect = document.getElementById("domainSelect");
-const slider = document.getElementById("slider");
-const leftPlot = document.getElementById("leftPlot");
-const rightPlot = document.getElementById("rightPlot");
-const rightPanel = document.getElementById("rightPanel");
-const plotWrap = document.getElementById("plotWrap");
-const tiles = document.getElementById("tiles");
-const fhrLabel = document.getElementById("fhrLabel");
-const playBtn = document.getElementById("playBtn");
-const viewerTitle = document.getElementById("viewerTitle");
-const leftPanelTitle = document.getElementById("leftPanelTitle");
-const rightPanelTitle = document.getElementById("rightPanelTitle");
-const savePngBtn = document.getElementById("savePngBtn");
-const saveGifBtn = document.getElementById("saveGifBtn");
-const gifStart = document.getElementById("gifStart");
-const gifEnd = document.getElementById("gifEnd");
-const gifStartLabel = document.getElementById("gifStartLabel");
-const gifEndLabel = document.getElementById("gifEndLabel");
-const gifDelay = document.getElementById("gifDelay");
-const gifLoop = document.getElementById("gifLoop");
-const saveStatus = document.getElementById("saveStatus");
 
-viewSelect.value = selectedView;
-modelSelect.value = selectedModel;
-memberSelect.value = selectedMember;
-rightModelSelect.value = rightModel;
-rightMemberSelect.value = rightMember;
+// =============================================================
+// ELEMENTS
+// =============================================================
 
-function isCompare() { return selectedView !== "single"; }
-function formatFhr(f) { return "F" + String(Number(f)).padStart(3, "0"); }
-function runId(run) { return typeof run === "string" ? run : run.id; }
-function runLabel(run) { return typeof run === "string" ? run.replace("_", " ") : (run.label || run.id); }
+const viewSelect =
+  document.getElementById(
+    "viewSelect"
+  );
 
-function modelLabel(model, member) {
-  return model === "refs" ? "REFS " + member.toUpperCase() : model.toUpperCase();
+
+const modelSelect =
+  document.getElementById(
+    "modelSelect"
+  );
+
+
+const memberSelect =
+  document.getElementById(
+    "memberSelect"
+  );
+
+
+const memberBlock =
+  document.getElementById(
+    "memberBlock"
+  );
+
+
+const leftProductSelect =
+  document.getElementById(
+    "leftProductSelect"
+  );
+
+
+const rightProductSelect =
+  document.getElementById(
+    "rightProductSelect"
+  );
+
+
+const rightProductBlock =
+  document.getElementById(
+    "rightProductBlock"
+  );
+
+
+const rightModelBlock =
+  document.getElementById(
+    "rightModelBlock"
+  );
+
+
+const rightModelSelect =
+  document.getElementById(
+    "rightModelSelect"
+  );
+
+
+const rightMemberBlock =
+  document.getElementById(
+    "rightMemberBlock"
+  );
+
+
+const rightMemberSelect =
+  document.getElementById(
+    "rightMemberSelect"
+  );
+
+
+const leftModelLabel =
+  document.getElementById(
+    "leftModelLabel"
+  );
+
+
+const leftProductLabel =
+  document.getElementById(
+    "leftProductLabel"
+  );
+
+
+const runSelect =
+  document.getElementById(
+    "runSelect"
+  );
+
+
+const domainSelect =
+  document.getElementById(
+    "domainSelect"
+  );
+
+
+const slider =
+  document.getElementById(
+    "slider"
+  );
+
+
+const leftPlot =
+  document.getElementById(
+    "leftPlot"
+  );
+
+
+const rightPlot =
+  document.getElementById(
+    "rightPlot"
+  );
+
+
+const rightPanel =
+  document.getElementById(
+    "rightPanel"
+  );
+
+
+const plotWrap =
+  document.getElementById(
+    "plotWrap"
+  );
+
+
+const tiles =
+  document.getElementById(
+    "tiles"
+  );
+
+
+const fhrLabel =
+  document.getElementById(
+    "fhrLabel"
+  );
+
+
+const playBtn =
+  document.getElementById(
+    "playBtn"
+  );
+
+
+const viewerTitle =
+  document.getElementById(
+    "viewerTitle"
+  );
+
+
+const leftPanelTitle =
+  document.getElementById(
+    "leftPanelTitle"
+  );
+
+
+const rightPanelTitle =
+  document.getElementById(
+    "rightPanelTitle"
+  );
+
+
+const savePngBtn =
+  document.getElementById(
+    "savePngBtn"
+  );
+
+
+const saveGifBtn =
+  document.getElementById(
+    "saveGifBtn"
+  );
+
+
+const gifStart =
+  document.getElementById(
+    "gifStart"
+  );
+
+
+const gifEnd =
+  document.getElementById(
+    "gifEnd"
+  );
+
+
+const gifStartLabel =
+  document.getElementById(
+    "gifStartLabel"
+  );
+
+
+const gifEndLabel =
+  document.getElementById(
+    "gifEndLabel"
+  );
+
+
+const gifDelay =
+  document.getElementById(
+    "gifDelay"
+  );
+
+
+const gifLoop =
+  document.getElementById(
+    "gifLoop"
+  );
+
+
+const saveStatus =
+  document.getElementById(
+    "saveStatus"
+  );
+
+
+// =============================================================
+// INITIAL VALUES
+// =============================================================
+
+viewSelect.value =
+  selectedView;
+
+
+modelSelect.value =
+  selectedModel;
+
+
+memberSelect.value =
+  selectedMember;
+
+
+rightModelSelect.value =
+  rightModel;
+
+
+rightMemberSelect.value =
+  rightMember;
+
+
+// =============================================================
+// BASIC HELPERS
+// =============================================================
+
+function isCompare() {
+
+  return (
+    selectedView
+    !==
+    "single"
+  );
+
 }
 
-function productOptionsForModel(model) {
-  if (model === "hrrr") {
+
+function formatFhr(f) {
+
+  return (
+    "F"
+    +
+    String(
+      Number(f)
+    ).padStart(
+      3,
+      "0"
+    )
+  );
+
+}
+
+
+function runId(run) {
+
+  return (
+    typeof run === "string"
+    ?
+    run
+    :
+    run.id
+  );
+
+}
+
+
+function runLabel(run) {
+
+  return (
+    typeof run === "string"
+    ?
+    run.replace(
+      "_",
+      " "
+    )
+    :
+    (
+      run.label
+      ||
+      run.id
+    )
+  );
+
+}
+
+
+function modelLabel(
+  model,
+  member
+) {
+
+  return (
+    model === "refs"
+    ?
+    "REFS "
+    +
+    member.toUpperCase()
+    :
+    model.toUpperCase()
+  );
+
+}
+
+
+// =============================================================
+// PRODUCT OPTIONS
+// =============================================================
+
+function productOptionsForModel(
+  model
+) {
+
+  if (
+    model === "hrrr"
+  ) {
+
     return [
-      ["refl_uh", "Reflectivity/UH"],
-      ["hail_swath", "Hail Swath"],
-      ["max_uh_02", "Max 0-2 km UH"]
+
+      [
+        "refl_uh",
+        "Reflectivity/UH"
+      ],
+
+      [
+        "hail_swath",
+        "Hail Swath"
+      ],
+
+      [
+        "max_uh_02",
+        "Max 0-2 km UH"
+      ],
+
+      [
+        "gust_dcape",
+        "Wind Gust / DCAPE"
+      ]
+
     ];
+
   }
+
+
   return [
-    ["refl_uh", "Reflectivity/UH"],
-    ["hail_swath", "Hail Swath"]
+
+    [
+      "refl_uh",
+      "Reflectivity/UH"
+    ],
+
+    [
+      "hail_swath",
+      "Hail Swath"
+    ]
+
   ];
+
 }
 
-function productLabel(model, product) {
-  const match = productOptionsForModel(model).find(x => x[0] === product);
-  return match ? match[1] : product;
+
+// =============================================================
+// PRODUCT LABEL
+// =============================================================
+
+function productLabel(
+  model,
+  product
+) {
+
+  const match =
+    productOptionsForModel(
+      model
+    ).find(
+      x =>
+        x[0]
+        ===
+        product
+    );
+
+
+  return (
+    match
+    ?
+    match[1]
+    :
+    product
+  );
+
 }
 
-function populateProductSelect(select, model, value) {
+
+// =============================================================
+// POPULATE PRODUCT SELECT
+// =============================================================
+
+function populateProductSelect(
+  select,
+  model,
+  value
+) {
+
   select.innerHTML = "";
-  const options = productOptionsForModel(model);
-  options.forEach(([v, label]) => {
-    const opt = document.createElement("option");
-    opt.value = v;
-    opt.textContent = label;
-    select.appendChild(opt);
-  });
-  const values = options.map(x => x[0]);
-  if (!values.includes(value)) value = values[0];
-  select.value = value;
+
+
+  const options =
+    productOptionsForModel(
+      model
+    );
+
+
+  options.forEach(
+    ([v, label]) => {
+
+      const opt =
+        document.createElement(
+          "option"
+        );
+
+
+      opt.value =
+        v;
+
+
+      opt.textContent =
+        label;
+
+
+      select.appendChild(
+        opt
+      );
+
+    }
+  );
+
+
+  const values =
+    options.map(
+      x => x[0]
+    );
+
+
+  if (
+    !values.includes(
+      value
+    )
+  ) {
+
+    value =
+      values[0];
+
+  }
+
+
+  select.value =
+    value;
+
+
   return value;
+
 }
+
+
+// =============================================================
+// DOMAIN AVAILABILITY
+// =============================================================
+
+const ALL_DOMAINS = [
+
+  [
+    "regional",
+    "Regional"
+  ],
+
+  [
+    "lbf",
+    "LBF"
+  ],
+
+  [
+    "central_plains",
+    "Central Plains"
+  ],
+
+  [
+    "spc_severe",
+    "SPC Severe"
+  ]
+
+];
+
+
+function productIsRegionalOnly(
+  model,
+  product
+) {
+
+  return (
+    model === "hrrr"
+    &&
+    product === "gust_dcape"
+  );
+
+}
+
+
+function mustUseRegionalDomain() {
+
+  if (
+    productIsRegionalOnly(
+      selectedModel,
+      leftProduct
+    )
+  ) {
+
+    return true;
+
+  }
+
+
+  if (
+    isCompare()
+    &&
+    productIsRegionalOnly(
+      rightModel,
+      rightProduct
+    )
+  ) {
+
+    return true;
+
+  }
+
+
+  return false;
+
+}
+
+
+function updateDomainOptions() {
+
+  const regionalOnly =
+    mustUseRegionalDomain();
+
+
+  const options =
+    regionalOnly
+    ?
+    [
+      [
+        "regional",
+        "Regional"
+      ]
+    ]
+    :
+    ALL_DOMAINS;
+
+
+  const oldDomain =
+    selectedDomain;
+
+
+  domainSelect.innerHTML =
+    "";
+
+
+  options.forEach(
+    ([value, label]) => {
+
+      const option =
+        document.createElement(
+          "option"
+        );
+
+
+      option.value =
+        value;
+
+
+      option.textContent =
+        label;
+
+
+      domainSelect.appendChild(
+        option
+      );
+
+    }
+  );
+
+
+  const allowed =
+    options.map(
+      x => x[0]
+    );
+
+
+  if (
+    allowed.includes(
+      oldDomain
+    )
+  ) {
+
+    selectedDomain =
+      oldDomain;
+
+  }
+
+  else {
+
+    selectedDomain =
+      "regional";
+
+  }
+
+
+  domainSelect.value =
+    selectedDomain;
+
+
+  // Show only Regional and prevent selecting
+  // another nonexistent domain for Gust/DCAPE.
+  domainSelect.disabled =
+    regionalOnly;
+
+}
+
+
+// =============================================================
+// UPDATE PRODUCT OPTIONS
+// =============================================================
 
 function updateProductOptions() {
-  leftProduct = populateProductSelect(leftProductSelect, selectedModel, leftProduct);
-  if (selectedView === "compare_products") {
-    rightModel = selectedModel;
-    rightMember = selectedMember;
-  }
-  rightProduct = populateProductSelect(rightProductSelect, rightModel, rightProduct);
 
-  if (selectedView === "compare_products" && rightProduct === leftProduct) {
-    const other = productOptionsForModel(selectedModel).find(x => x[0] !== leftProduct);
-    if (other) {
-      rightProduct = other[0];
-      rightProductSelect.value = rightProduct;
-    }
+  leftProduct =
+    populateProductSelect(
+      leftProductSelect,
+      selectedModel,
+      leftProduct
+    );
+
+
+  if (
+    selectedView
+    ===
+    "compare_products"
+  ) {
+
+    rightModel =
+      selectedModel;
+
+
+    rightMember =
+      selectedMember;
+
   }
+
+
+  rightProduct =
+    populateProductSelect(
+      rightProductSelect,
+      rightModel,
+      rightProduct
+    );
+
+
+  if (
+    selectedView
+    ===
+    "compare_products"
+
+    &&
+
+    rightProduct
+    ===
+    leftProduct
+  ) {
+
+    const other =
+      productOptionsForModel(
+        selectedModel
+      ).find(
+        x =>
+          x[0]
+          !==
+          leftProduct
+      );
+
+
+    if (
+      other
+    ) {
+
+      rightProduct =
+        other[0];
+
+
+      rightProductSelect.value =
+        rightProduct;
+
+    }
+
+  }
+
+
+  updateDomainOptions();
+
 }
+
+
+// =============================================================
+// VISIBILITY
+// =============================================================
 
 function updateVisibility() {
-  memberBlock.style.display = selectedModel === "refs" ? "inline-flex" : "none";
-  const compare = isCompare();
-  rightProductBlock.style.display = compare ? "inline-flex" : "none";
-  rightPanel.style.display = compare ? "block" : "none";
-  plotWrap.classList.toggle("compare", compare);
 
-  if (selectedView === "compare_models") {
-    rightModelBlock.style.display = "inline-flex";
-    rightMemberBlock.style.display = rightModel === "refs" ? "inline-flex" : "none";
-    leftModelLabel.textContent = "Left Model:";
-    leftProductLabel.textContent = "Left Product:";
-  } else if (selectedView === "compare_products") {
-    rightModelBlock.style.display = "none";
-    rightMemberBlock.style.display = "none";
-    leftModelLabel.textContent = "Model:";
-    leftProductLabel.textContent = "Left Product:";
-  } else {
-    rightModelBlock.style.display = "none";
-    rightMemberBlock.style.display = "none";
-    leftModelLabel.textContent = "Model:";
-    leftProductLabel.textContent = "Product:";
+  memberBlock.style.display =
+    selectedModel === "refs"
+    ?
+    "inline-flex"
+    :
+    "none";
+
+
+  const compare =
+    isCompare();
+
+
+  rightProductBlock.style.display =
+    compare
+    ?
+    "inline-flex"
+    :
+    "none";
+
+
+  rightPanel.style.display =
+    compare
+    ?
+    "block"
+    :
+    "none";
+
+
+  plotWrap.classList.toggle(
+    "compare",
+    compare
+  );
+
+
+  if (
+    selectedView
+    ===
+    "compare_models"
+  ) {
+
+    rightModelBlock.style.display =
+      "inline-flex";
+
+
+    rightMemberBlock.style.display =
+      rightModel === "refs"
+      ?
+      "inline-flex"
+      :
+      "none";
+
+
+    leftModelLabel.textContent =
+      "Left Model:";
+
+
+    leftProductLabel.textContent =
+      "Left Product:";
+
   }
-  savePngBtn.textContent = compare ? "Save Two-Panel PNG" : "Save PNG";
+
+  else if (
+    selectedView
+    ===
+    "compare_products"
+  ) {
+
+    rightModelBlock.style.display =
+      "none";
+
+
+    rightMemberBlock.style.display =
+      "none";
+
+
+    leftModelLabel.textContent =
+      "Model:";
+
+
+    leftProductLabel.textContent =
+      "Left Product:";
+
+  }
+
+  else {
+
+    rightModelBlock.style.display =
+      "none";
+
+
+    rightMemberBlock.style.display =
+      "none";
+
+
+    leftModelLabel.textContent =
+      "Model:";
+
+
+    leftProductLabel.textContent =
+      "Product:";
+
+  }
+
+
+  savePngBtn.textContent =
+    compare
+    ?
+    "Save Two-Panel PNG"
+    :
+    "Save PNG";
+
 }
+
+
+// =============================================================
+// TITLE
+// =============================================================
 
 function updateTitle() {
-  const lm = modelLabel(selectedModel, selectedMember);
-  const rm = modelLabel(rightModel, rightMember);
-  if (selectedView === "single") {
-    viewerTitle.textContent = `${lm} ${productLabel(selectedModel, leftProduct)}`;
-    leftPanelTitle.textContent = "";
-    rightPanelTitle.textContent = "";
-  } else if (selectedView === "compare_products") {
-    viewerTitle.textContent = `${lm} Product Comparison`;
-    leftPanelTitle.textContent = productLabel(selectedModel, leftProduct);
-    rightPanelTitle.textContent = productLabel(rightModel, rightProduct);
-  } else {
-    viewerTitle.textContent = `${lm} vs ${rm}`;
-    leftPanelTitle.textContent = `${lm} ${productLabel(selectedModel, leftProduct)}`;
-    rightPanelTitle.textContent = `${rm} ${productLabel(rightModel, rightProduct)}`;
+
+  const lm =
+    modelLabel(
+      selectedModel,
+      selectedMember
+    );
+
+
+  const rm =
+    modelLabel(
+      rightModel,
+      rightMember
+    );
+
+
+  if (
+    selectedView
+    ===
+    "single"
+  ) {
+
+    viewerTitle.textContent =
+      `${lm} ${productLabel(
+        selectedModel,
+        leftProduct
+      )}`;
+
+
+    leftPanelTitle.textContent =
+      "";
+
+
+    rightPanelTitle.textContent =
+      "";
+
   }
-}
 
-function getProductPath(model, member, product) {
-  if (model === "refs") return `/runs/cams/refs/${member}/${product}`;
-  return `/runs/cams/${model}/${product}`;
-}
+  else if (
+    selectedView
+    ===
+    "compare_products"
+  ) {
 
-function getFileName(model, member, product, fhr) {
-  const f = String(fhr).padStart(3, "0");
-  if (model === "refs") {
-    if (product === "hail_swath") return `refs_${member}_hail_swath_f${f}.png`;
-    return `refs_${member}_lbf_f${f}.png`;
+    viewerTitle.textContent =
+      `${lm} Product Comparison`;
+
+
+    leftPanelTitle.textContent =
+      productLabel(
+        selectedModel,
+        leftProduct
+      );
+
+
+    rightPanelTitle.textContent =
+      productLabel(
+        rightModel,
+        rightProduct
+      );
+
   }
-  if (product === "hail_swath") return `${model}_hail_swath_f${f}.png`;
-  if (product === "max_uh_02") return `${model}_max_uh_02_f${f}.png`;
-  return `${model}_lbf_f${f}.png`;
+
+  else {
+
+    viewerTitle.textContent =
+      `${lm} vs ${rm}`;
+
+
+    leftPanelTitle.textContent =
+      `${lm} ${productLabel(
+        selectedModel,
+        leftProduct
+      )}`;
+
+
+    rightPanelTitle.textContent =
+      `${rm} ${productLabel(
+        rightModel,
+        rightProduct
+      )}`;
+
+  }
+
 }
 
-function panelImgSrc(model, member, product, fhr) {
-  if (!selectedRun) return "";
-  return BASE_URL + getProductPath(model, member, product) + "/" + selectedRun + "/" + selectedDomain + "/" + getFileName(model, member, product, fhr) + "?t=" + Date.now();
+
+// =============================================================
+// PRODUCT PATH
+// =============================================================
+
+function getProductPath(
+  model,
+  member,
+  product
+) {
+
+  if (
+    model === "refs"
+  ) {
+
+    return (
+      `/runs/cams/refs/`
+      +
+      `${member}/`
+      +
+      `${product}`
+    );
+
+  }
+
+
+  return (
+    `/runs/cams/`
+    +
+    `${model}/`
+    +
+    `${product}`
+  );
+
 }
 
-function leftImgSrc(fhr) { return panelImgSrc(selectedModel, selectedMember, leftProduct, fhr); }
-function rightImgSrc(fhr) { return panelImgSrc(rightModel, rightMember, rightProduct, fhr); }
 
-async function fetchRuns(model, member, product) {
-  const url = BASE_URL + getProductPath(model, member, product) + "/runs.json?t=" + Date.now();
+// =============================================================
+// FILE NAME
+// =============================================================
+
+function getFileName(
+  model,
+  member,
+  product,
+  fhr
+) {
+
+  const f =
+    String(
+      fhr
+    ).padStart(
+      3,
+      "0"
+    );
+
+
+  if (
+    model === "refs"
+  ) {
+
+    if (
+      product === "hail_swath"
+    ) {
+
+      return (
+        `refs_${member}_`
+        +
+        `hail_swath_f${f}.png`
+      );
+
+    }
+
+
+    return (
+      `refs_${member}_`
+      +
+      `lbf_f${f}.png`
+    );
+
+  }
+
+
+  if (
+    product === "hail_swath"
+  ) {
+
+    return (
+      `${model}_`
+      +
+      `hail_swath_f${f}.png`
+    );
+
+  }
+
+
+  if (
+    product === "max_uh_02"
+  ) {
+
+    return (
+      `${model}_`
+      +
+      `max_uh_02_f${f}.png`
+    );
+
+  }
+
+
+  if (
+    model === "hrrr"
+    &&
+    product === "gust_dcape"
+  ) {
+
+    return (
+      `hrrr_gust_dcape_`
+      +
+      `f${f}.png`
+    );
+
+  }
+
+
+  return (
+    `${model}_`
+    +
+    `lbf_f${f}.png`
+  );
+
+}
+
+
+// =============================================================
+// IMAGE SOURCE
+// =============================================================
+
+function panelImgSrc(
+  model,
+  member,
+  product,
+  fhr
+) {
+
+  if (
+    !selectedRun
+  ) {
+
+    return "";
+
+  }
+
+
+  return (
+
+    BASE_URL
+
+    +
+
+    getProductPath(
+      model,
+      member,
+      product
+    )
+
+    +
+
+    "/"
+
+    +
+
+    selectedRun
+
+    +
+
+    "/"
+
+    +
+
+    selectedDomain
+
+    +
+
+    "/"
+
+    +
+
+    getFileName(
+      model,
+      member,
+      product,
+      fhr
+    )
+
+    +
+
+    "?t="
+
+    +
+
+    Date.now()
+
+  );
+
+}
+
+
+function leftImgSrc(
+  fhr
+) {
+
+  return panelImgSrc(
+    selectedModel,
+    selectedMember,
+    leftProduct,
+    fhr
+  );
+
+}
+
+
+function rightImgSrc(
+  fhr
+) {
+
+  return panelImgSrc(
+    rightModel,
+    rightMember,
+    rightProduct,
+    fhr
+  );
+
+}
+
+
+// =============================================================
+// FETCH RUNS
+// =============================================================
+
+async function fetchRuns(
+  model,
+  member,
+  product
+) {
+
+  const url = (
+
+    BASE_URL
+
+    +
+
+    getProductPath(
+      model,
+      member,
+      product
+    )
+
+    +
+
+    "/runs.json?t="
+
+    +
+
+    Date.now()
+
+  );
+
+
   try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    return data.runs || [];
-  } catch (err) {
-    console.error("Could not load runs.json:", url, err);
-    return [];
+
+    const response =
+      await fetch(
+        url
+      );
+
+
+    if (
+      !response.ok
+    ) {
+
+      throw new Error(
+        `HTTP ${response.status}`
+      );
+
+    }
+
+
+    const data =
+      await response.json();
+
+
+    return (
+      data.runs
+      ||
+      []
+    );
+
   }
+
+  catch (
+    err
+  ) {
+
+    console.error(
+      "Could not load runs.json:",
+      url,
+      err
+    );
+
+
+    return [];
+
+  }
+
 }
+
+
+// =============================================================
+// LOAD RUNS
+// =============================================================
 
 async function loadRunsJson() {
-  leftRuns = await fetchRuns(selectedModel, selectedMember, leftProduct);
-  if (!isCompare()) {
-    rightRuns = [];
-    runs = leftRuns;
-  } else {
-    rightRuns = await fetchRuns(rightModel, rightMember, rightProduct);
-    const rightIds = new Set(rightRuns.map(runId));
-    runs = leftRuns.filter(r => rightIds.has(runId(r)));
+
+  leftRuns =
+    await fetchRuns(
+      selectedModel,
+      selectedMember,
+      leftProduct
+    );
+
+
+  if (
+    !isCompare()
+  ) {
+
+    rightRuns =
+      [];
+
+
+    runs =
+      leftRuns;
+
   }
-  if (runs.length) {
-    const ids = runs.map(runId);
-    if (!ids.includes(selectedRun)) selectedRun = ids[0];
-  } else selectedRun = "";
+
+  else {
+
+    rightRuns =
+      await fetchRuns(
+        rightModel,
+        rightMember,
+        rightProduct
+      );
+
+
+    const rightIds =
+      new Set(
+        rightRuns.map(
+          runId
+        )
+      );
+
+
+    runs =
+      leftRuns.filter(
+        r =>
+          rightIds.has(
+            runId(r)
+          )
+      );
+
+  }
+
+
+  if (
+    runs.length
+  ) {
+
+    const ids =
+      runs.map(
+        runId
+      );
+
+
+    if (
+      !ids.includes(
+        selectedRun
+      )
+    ) {
+
+      selectedRun =
+        ids[0];
+
+    }
+
+  }
+
+  else {
+
+    selectedRun =
+      "";
+
+  }
+
 }
+
+
+// =============================================================
+// RUN DROPDOWN
+// =============================================================
 
 function populateRunDropdown() {
-  runSelect.innerHTML = "";
-  runs.forEach(run => {
-    const opt = document.createElement("option");
-    opt.value = runId(run);
-    opt.textContent = runLabel(run);
-    runSelect.appendChild(opt);
-  });
-  runSelect.value = selectedRun;
+
+  runSelect.innerHTML =
+    "";
+
+
+  runs.forEach(
+    run => {
+
+      const opt =
+        document.createElement(
+          "option"
+        );
+
+
+      opt.value =
+        runId(
+          run
+        );
+
+
+      opt.textContent =
+        runLabel(
+          run
+        );
+
+
+      runSelect.appendChild(
+        opt
+      );
+
+    }
+  );
+
+
+  runSelect.value =
+    selectedRun;
+
 }
 
-function fallbackMaxFhr(model, runText) {
-  const hour = Number(((runText || "").split("_")[1] || "").replace("z", ""));
-  if (model === "hrrr") return [0,6,12,18].includes(hour) ? 48 : 18;
-  if (model === "rrfs") return [0,6,12,18].includes(hour) ? 60 : 18;
-  if (model === "refs") return 60;
+
+// =============================================================
+// MAX FORECAST HOUR
+// =============================================================
+
+function fallbackMaxFhr(
+  model,
+  runText
+) {
+
+  const hour =
+    Number(
+      (
+        (
+          runText
+          ||
+          ""
+        )
+        .split("_")[1]
+        ||
+        ""
+      )
+      .replace(
+        "z",
+        ""
+      )
+    );
+
+
+  if (
+    model === "hrrr"
+  ) {
+
+    return (
+      [
+        0,
+        6,
+        12,
+        18
+      ]
+      .includes(
+        hour
+      )
+      ?
+      48
+      :
+      18
+    );
+
+  }
+
+
+  if (
+    model === "rrfs"
+  ) {
+
+    return (
+      [
+        0,
+        6,
+        12,
+        18
+      ]
+      .includes(
+        hour
+      )
+      ?
+      60
+      :
+      18
+    );
+
+  }
+
+
+  if (
+    model === "refs"
+  ) {
+
+    return 60;
+
+  }
+
+
   return 18;
+
 }
 
-function runMax(run, model) {
-  if (run && typeof run !== "string" && run.max_fhr !== undefined) return Number(run.max_fhr);
-  return fallbackMaxFhr(model, run ? runId(run) : selectedRun);
+
+function runMax(
+  run,
+  model
+) {
+
+  if (
+    run
+    &&
+    typeof run !== "string"
+    &&
+    run.max_fhr !== undefined
+  ) {
+
+    return Number(
+      run.max_fhr
+    );
+
+  }
+
+
+  return fallbackMaxFhr(
+    model,
+    run
+    ?
+    runId(
+      run
+    )
+    :
+    selectedRun
+  );
+
 }
+
 
 function updateMaxFhrForRun() {
-  const leftRun = leftRuns.find(r => runId(r) === selectedRun);
-  const leftMax = runMax(leftRun, selectedModel);
-  if (!isCompare()) maxFhr = leftMax;
-  else {
-    const rightRun = rightRuns.find(r => runId(r) === selectedRun);
-    const rightMax = runMax(rightRun, rightModel);
-    maxFhr = Math.min(leftMax, rightMax);
+
+  const leftRun =
+    leftRuns.find(
+      r =>
+        runId(r)
+        ===
+        selectedRun
+    );
+
+
+  const leftMax =
+    runMax(
+      leftRun,
+      selectedModel
+    );
+
+
+  if (
+    !isCompare()
+  ) {
+
+    maxFhr =
+      leftMax;
+
   }
-  slider.max = maxFhr;
+
+  else {
+
+    const rightRun =
+      rightRuns.find(
+        r =>
+          runId(r)
+          ===
+          selectedRun
+      );
+
+
+    const rightMax =
+      runMax(
+        rightRun,
+        rightModel
+      );
+
+
+    maxFhr =
+      Math.min(
+        leftMax,
+        rightMax
+      );
+
+  }
+
+
+  slider.max =
+    maxFhr;
+
 }
+
+
+// =============================================================
+// GIF RANGE
+// =============================================================
 
 function resetGifRange() {
-  gifStart.min = 0; gifEnd.min = 0;
-  gifStart.max = maxFhr; gifEnd.max = maxFhr;
-  gifStart.value = 0; gifEnd.value = maxFhr;
-  gifStartLabel.textContent = formatFhr(0);
-  gifEndLabel.textContent = formatFhr(maxFhr);
+
+  gifStart.min =
+    0;
+
+
+  gifEnd.min =
+    0;
+
+
+  gifStart.max =
+    maxFhr;
+
+
+  gifEnd.max =
+    maxFhr;
+
+
+  gifStart.value =
+    0;
+
+
+  gifEnd.value =
+    maxFhr;
+
+
+  gifStartLabel.textContent =
+    formatFhr(
+      0
+    );
+
+
+  gifEndLabel.textContent =
+    formatFhr(
+      maxFhr
+    );
+
 }
+
 
 function syncGifRangeLabels() {
-  let a = Number(gifStart.value), b = Number(gifEnd.value);
-  if (a > b) { b = a; gifEnd.value = b; }
-  gifStartLabel.textContent = formatFhr(a);
-  gifEndLabel.textContent = formatFhr(b);
+
+  let a =
+    Number(
+      gifStart.value
+    );
+
+
+  let b =
+    Number(
+      gifEnd.value
+    );
+
+
+  if (
+    a > b
+  ) {
+
+    b =
+      a;
+
+
+    gifEnd.value =
+      b;
+
+  }
+
+
+  gifStartLabel.textContent =
+    formatFhr(
+      a
+    );
+
+
+  gifEndLabel.textContent =
+    formatFhr(
+      b
+    );
+
 }
 
-async function frameExists(url) {
+
+// =============================================================
+// FRAME EXISTS
+// =============================================================
+
+async function frameExists(
+  url
+) {
+
   try {
-    const response = await fetch(url, { method: "HEAD" });
+
+    const response =
+      await fetch(
+        url,
+        {
+          method:
+            "HEAD"
+        }
+      );
+
+
     return response.ok;
-  } catch (err) { return false; }
+
+  }
+
+  catch (
+    err
+  ) {
+
+    return false;
+
+  }
+
 }
+
+
+// =============================================================
+// AVAILABILITY
+// =============================================================
 
 async function refreshHourAvailability() {
-  availableFrames = [];
+
+  availableFrames =
+    [];
+
+
   updateMaxFhrForRun();
-  if (tiles.children.length !== maxFhr + 1) {
-    tiles.innerHTML = "";
-    for (let f = 0; f <= maxFhr; f++) {
-      const button = document.createElement("button");
-      button.className = "frame missing";
-      button.textContent = String(f).padStart(3, "0");
-      button.disabled = true;
-      button.dataset.fhr = f;
-      button.onclick = () => setFrame(f);
-      tiles.appendChild(button);
+
+
+  if (
+    tiles.children.length
+    !==
+    maxFhr + 1
+  ) {
+
+    tiles.innerHTML =
+      "";
+
+
+    for (
+      let f = 0;
+      f <= maxFhr;
+      f++
+    ) {
+
+      const button =
+        document.createElement(
+          "button"
+        );
+
+
+      button.className =
+        "frame missing";
+
+
+      button.textContent =
+        String(
+          f
+        ).padStart(
+          3,
+          "0"
+        );
+
+
+      button.disabled =
+        true;
+
+
+      button.dataset.fhr =
+        f;
+
+
+      button.onclick =
+        () =>
+          setFrame(
+            f
+          );
+
+
+      tiles.appendChild(
+        button
+      );
+
     }
+
   }
-  for (let f = 0; f <= maxFhr; f++) {
-    const button = tiles.children[f];
-    const leftOK = await frameExists(leftImgSrc(f));
-    const rightOK = isCompare() ? await frameExists(rightImgSrc(f)) : true;
-    if (leftOK && rightOK) {
-      availableFrames.push(f);
-      button.disabled = false;
-      button.className = "frame available";
-    } else {
-      button.disabled = true;
-      button.className = "frame missing";
+
+
+  for (
+    let f = 0;
+    f <= maxFhr;
+    f++
+  ) {
+
+    const button =
+      tiles.children[
+        f
+      ];
+
+
+    const leftOK =
+      await frameExists(
+        leftImgSrc(
+          f
+        )
+      );
+
+
+    const rightOK =
+      isCompare()
+      ?
+      await frameExists(
+        rightImgSrc(
+          f
+        )
+      )
+      :
+      true;
+
+
+    if (
+      leftOK
+      &&
+      rightOK
+    ) {
+
+      availableFrames.push(
+        f
+      );
+
+
+      button.disabled =
+        false;
+
+
+      button.className =
+        "frame available";
+
     }
+
+    else {
+
+      button.disabled =
+        true;
+
+
+      button.className =
+        "frame missing";
+
+    }
+
   }
+
+
   updateActiveButton();
+
 }
 
-function firstAvailableFrame() { return availableFrames.length ? availableFrames[0] : 0; }
+
+// =============================================================
+// FRAME HELPERS
+// =============================================================
+
+function firstAvailableFrame() {
+
+  return (
+    availableFrames.length
+    ?
+    availableFrames[0]
+    :
+    0
+  );
+
+}
+
+
 function updateActiveButton() {
-  document.querySelectorAll(".frame").forEach(btn => {
-    btn.classList.remove("active");
-    if (Number(btn.dataset.fhr) === current) btn.classList.add("active");
-  });
+
+  document
+    .querySelectorAll(
+      ".frame"
+    )
+    .forEach(
+      btn => {
+
+        btn.classList.remove(
+          "active"
+        );
+
+
+        if (
+          Number(
+            btn.dataset.fhr
+          )
+          ===
+          current
+        ) {
+
+          btn.classList.add(
+            "active"
+          );
+
+        }
+
+      }
+    );
+
 }
 
-function setFrame(fhr) {
-  if (!selectedRun) return;
-  current = Number(fhr);
-  slider.value = current;
-  fhrLabel.textContent = String(current).padStart(3, "0");
-  leftPlot.src = leftImgSrc(current);
-  if (isCompare()) rightPlot.src = rightImgSrc(current);
+
+// =============================================================
+// SET FRAME
+// =============================================================
+
+function setFrame(
+  fhr
+) {
+
+  if (
+    !selectedRun
+  ) {
+
+    return;
+
+  }
+
+
+  current =
+    Number(
+      fhr
+    );
+
+
+  slider.value =
+    current;
+
+
+  fhrLabel.textContent =
+    String(
+      current
+    ).padStart(
+      3,
+      "0"
+    );
+
+
+  leftPlot.src =
+    leftImgSrc(
+      current
+    );
+
+
+  if (
+    isCompare()
+  ) {
+
+    rightPlot.src =
+      rightImgSrc(
+        current
+      );
+
+  }
+
+
   updateActiveButton();
+
 }
 
-slider.addEventListener("input", () => {
-  const f = Number(slider.value);
-  if (availableFrames.includes(f)) setFrame(f);
-  else slider.value = current;
-});
+
+// =============================================================
+// SLIDER
+// =============================================================
+
+slider.addEventListener(
+  "input",
+  () => {
+
+    const f =
+      Number(
+        slider.value
+      );
+
+
+    if (
+      availableFrames.includes(
+        f
+      )
+    ) {
+
+      setFrame(
+        f
+      );
+
+    }
+
+    else {
+
+      slider.value =
+        current;
+
+    }
+
+  }
+);
+
+
+// =============================================================
+// PLAY
+// =============================================================
 
 function togglePlay() {
-  playing = !playing;
-  playBtn.textContent = playing ? "⏸ Pause" : "▶ Play";
-  if (!playing) { clearInterval(timer); return; }
-  timer = setInterval(() => {
-    if (!availableFrames.length) return;
-    let idx = availableFrames.indexOf(current);
-    idx = (idx + 1) % availableFrames.length;
-    setFrame(availableFrames[idx]);
-  }, 700);
+
+  playing =
+    !playing;
+
+
+  playBtn.textContent =
+    playing
+    ?
+    "⏸ Pause"
+    :
+    "▶ Play";
+
+
+  if (
+    !playing
+  ) {
+
+    clearInterval(
+      timer
+    );
+
+
+    return;
+
+  }
+
+
+  timer =
+    setInterval(
+      () => {
+
+        if (
+          !availableFrames.length
+        ) {
+
+          return;
+
+        }
+
+
+        let idx =
+          availableFrames.indexOf(
+            current
+          );
+
+
+        idx =
+          (
+            idx + 1
+          )
+          %
+          availableFrames.length;
+
+
+        setFrame(
+          availableFrames[
+            idx
+          ]
+        );
+
+      },
+
+      700
+
+    );
+
 }
+
+
+// =============================================================
+// REFRESH VIEWER
+// =============================================================
 
 async function refreshViewer() {
+
   await loadRunsJson();
+
+
   populateRunDropdown();
+
+
   await refreshHourAvailability();
+
+
   resetGifRange();
-  if (current > maxFhr || !availableFrames.includes(current)) setFrame(firstAvailableFrame());
-  else setFrame(current);
+
+
+  if (
+    current > maxFhr
+    ||
+    !availableFrames.includes(
+      current
+    )
+  ) {
+
+    setFrame(
+      firstAvailableFrame()
+    );
+
+  }
+
+  else {
+
+    setFrame(
+      current
+    );
+
+  }
+
 }
 
-async function latestRun() { selectedRun = ""; await refreshViewer(); setFrame(firstAvailableFrame()); }
+
+// =============================================================
+// LATEST RUN
+// =============================================================
+
+async function latestRun() {
+
+  selectedRun =
+    "";
+
+
+  await refreshViewer();
+
+
+  setFrame(
+    firstAvailableFrame()
+  );
+
+}
+
+
+// =============================================================
+// CHANGE VIEW
+// =============================================================
 
 async function changeView() {
-  selectedView = viewSelect.value;
-  selectedRun = "";
-  if (selectedView === "compare_products") {
-    rightModel = selectedModel;
-    rightMember = selectedMember;
-    rightProduct = selectedModel === "hrrr" ? "max_uh_02" : "hail_swath";
-  } else if (selectedView === "compare_models") {
-    if (selectedModel === rightModel) { selectedModel = "hrrr"; rightModel = "rrfs"; }
-    leftProduct = "refl_uh";
-    rightProduct = "refl_uh";
-    modelSelect.value = selectedModel;
-    rightModelSelect.value = rightModel;
+
+  selectedView =
+    viewSelect.value;
+
+
+  selectedRun =
+    "";
+
+
+  if (
+    selectedView
+    ===
+    "compare_products"
+  ) {
+
+    rightModel =
+      selectedModel;
+
+
+    rightMember =
+      selectedMember;
+
+
+    rightProduct =
+      selectedModel === "hrrr"
+      ?
+      "max_uh_02"
+      :
+      "hail_swath";
+
   }
+
+  else if (
+    selectedView
+    ===
+    "compare_models"
+  ) {
+
+    if (
+      selectedModel
+      ===
+      rightModel
+    ) {
+
+      selectedModel =
+        "hrrr";
+
+
+      rightModel =
+        "rrfs";
+
+    }
+
+
+    leftProduct =
+      "refl_uh";
+
+
+    rightProduct =
+      "refl_uh";
+
+
+    modelSelect.value =
+      selectedModel;
+
+
+    rightModelSelect.value =
+      rightModel;
+
+  }
+
+
   updateProductOptions();
+
   updateVisibility();
+
   updateTitle();
+
+
   await refreshViewer();
+
 }
+
+
+// =============================================================
+// CHANGE MODEL
+// =============================================================
 
 async function changeModel() {
-  selectedModel = modelSelect.value;
-  if (selectedModel !== "refs") { selectedMember = "m01"; memberSelect.value = selectedMember; }
-  leftProduct = "refl_uh";
-  if (selectedView === "compare_products") {
-    rightModel = selectedModel;
-    rightMember = selectedMember;
-    rightProduct = selectedModel === "hrrr" ? "max_uh_02" : "hail_swath";
+
+  selectedModel =
+    modelSelect.value;
+
+
+  if (
+    selectedModel !== "refs"
+  ) {
+
+    selectedMember =
+      "m01";
+
+
+    memberSelect.value =
+      selectedMember;
+
   }
-  selectedRun = "";
-  updateProductOptions(); updateVisibility(); updateTitle();
+
+
+  leftProduct =
+    "refl_uh";
+
+
+  if (
+    selectedView
+    ===
+    "compare_products"
+  ) {
+
+    rightModel =
+      selectedModel;
+
+
+    rightMember =
+      selectedMember;
+
+
+    rightProduct =
+      selectedModel === "hrrr"
+      ?
+      "max_uh_02"
+      :
+      "hail_swath";
+
+  }
+
+
+  selectedRun =
+    "";
+
+
+  updateProductOptions();
+
+  updateVisibility();
+
+  updateTitle();
+
+
   await refreshViewer();
+
 }
+
+
+// =============================================================
+// CHANGE RIGHT MODEL
+// =============================================================
 
 async function changeRightModel() {
-  rightModel = rightModelSelect.value;
-  if (rightModel !== "refs") { rightMember = "m01"; rightMemberSelect.value = rightMember; }
-  rightProduct = "refl_uh";
-  selectedRun = "";
-  updateProductOptions(); updateVisibility(); updateTitle();
+
+  rightModel =
+    rightModelSelect.value;
+
+
+  if (
+    rightModel !== "refs"
+  ) {
+
+    rightMember =
+      "m01";
+
+
+    rightMemberSelect.value =
+      rightMember;
+
+  }
+
+
+  rightProduct =
+    "refl_uh";
+
+
+  selectedRun =
+    "";
+
+
+  updateProductOptions();
+
+  updateVisibility();
+
+  updateTitle();
+
+
   await refreshViewer();
+
 }
+
+
+// =============================================================
+// CHANGE MEMBER
+// =============================================================
 
 async function changeMember() {
-  selectedMember = memberSelect.value;
-  if (selectedView === "compare_products") rightMember = selectedMember;
-  selectedRun = ""; updateVisibility(); updateTitle(); await refreshViewer();
+
+  selectedMember =
+    memberSelect.value;
+
+
+  if (
+    selectedView
+    ===
+    "compare_products"
+  ) {
+
+    rightMember =
+      selectedMember;
+
+  }
+
+
+  selectedRun =
+    "";
+
+
+  updateVisibility();
+
+  updateTitle();
+
+
+  await refreshViewer();
+
 }
-async function changeRightMember() { rightMember = rightMemberSelect.value; selectedRun = ""; updateTitle(); await refreshViewer(); }
+
+
+// =============================================================
+// CHANGE RIGHT MEMBER
+// =============================================================
+
+async function changeRightMember() {
+
+  rightMember =
+    rightMemberSelect.value;
+
+
+  selectedRun =
+    "";
+
+
+  updateTitle();
+
+
+  await refreshViewer();
+
+}
+
+
+// =============================================================
+// CHANGE LEFT PRODUCT
+// =============================================================
 
 async function changeLeftProduct() {
-  leftProduct = leftProductSelect.value;
-  if (selectedView === "compare_products" && leftProduct === rightProduct) {
-    const other = productOptionsForModel(selectedModel).find(x => x[0] !== leftProduct);
-    if (other) { rightProduct = other[0]; rightProductSelect.value = rightProduct; }
+
+  leftProduct =
+    leftProductSelect.value;
+
+
+  if (
+    selectedView
+    ===
+    "compare_products"
+
+    &&
+
+    leftProduct
+    ===
+    rightProduct
+  ) {
+
+    const other =
+      productOptionsForModel(
+        selectedModel
+      ).find(
+        x =>
+          x[0]
+          !==
+          leftProduct
+      );
+
+
+    if (
+      other
+    ) {
+
+      rightProduct =
+        other[0];
+
+
+      rightProductSelect.value =
+        rightProduct;
+
+    }
+
   }
-  selectedRun = ""; updateTitle(); await refreshViewer();
+
+
+  updateDomainOptions();
+
+
+  selectedRun =
+    "";
+
+
+  updateTitle();
+
+
+  await refreshViewer();
+
 }
+
+
+// =============================================================
+// CHANGE RIGHT PRODUCT
+// =============================================================
 
 async function changeRightProduct() {
-  rightProduct = rightProductSelect.value;
-  if (selectedView === "compare_products" && rightProduct === leftProduct) {
-    const other = productOptionsForModel(selectedModel).find(x => x[0] !== rightProduct);
-    if (other) { leftProduct = other[0]; leftProductSelect.value = leftProduct; }
+
+  rightProduct =
+    rightProductSelect.value;
+
+
+  if (
+    selectedView
+    ===
+    "compare_products"
+
+    &&
+
+    rightProduct
+    ===
+    leftProduct
+  ) {
+
+    const other =
+      productOptionsForModel(
+        selectedModel
+      ).find(
+        x =>
+          x[0]
+          !==
+          rightProduct
+      );
+
+
+    if (
+      other
+    ) {
+
+      leftProduct =
+        other[0];
+
+
+      leftProductSelect.value =
+        leftProduct;
+
+    }
+
   }
-  selectedRun = ""; updateTitle(); await refreshViewer();
+
+
+  updateDomainOptions();
+
+
+  selectedRun =
+    "";
+
+
+  updateTitle();
+
+
+  await refreshViewer();
+
 }
+
+
+// =============================================================
+// CHANGE RUN
+// =============================================================
 
 async function changeRun() {
-  selectedRun = runSelect.value;
-  await refreshHourAvailability(); resetGifRange();
-  if (current > maxFhr || !availableFrames.includes(current)) setFrame(firstAvailableFrame());
-  else setFrame(current);
+
+  selectedRun =
+    runSelect.value;
+
+
+  await refreshHourAvailability();
+
+
+  resetGifRange();
+
+
+  if (
+    current > maxFhr
+    ||
+    !availableFrames.includes(
+      current
+    )
+  ) {
+
+    setFrame(
+      firstAvailableFrame()
+    );
+
+  }
+
+  else {
+
+    setFrame(
+      current
+    );
+
+  }
+
 }
+
+
+// =============================================================
+// CHANGE DOMAIN
+// =============================================================
 
 async function changeDomain() {
-  selectedDomain = domainSelect.value;
+
+  selectedDomain =
+    domainSelect.value;
+
+
   await refreshHourAvailability();
-  if (!availableFrames.includes(current)) setFrame(firstAvailableFrame()); else setFrame(current);
-}
 
-function downloadName(ext, start=null, end=null) {
-  let base;
-  if (selectedView === "single") base = `${selectedModel}_${leftProduct}`;
-  else if (selectedView === "compare_products") base = `${selectedModel}_${leftProduct}_vs_${rightProduct}`;
-  else base = `${selectedModel}_${leftProduct}_vs_${rightModel}_${rightProduct}`;
-  base += `_${selectedRun}_${selectedDomain}`;
-  base += start !== null ? `_f${String(start).padStart(3,"0")}-f${String(end).padStart(3,"0")}` : `_f${String(current).padStart(3,"0")}`;
-  return base + "." + ext;
-}
 
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob), a = document.createElement("a");
-  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+  if (
+    !availableFrames.includes(
+      current
+    )
+  ) {
 
-async function fetchImage(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("Image fetch failed");
-  const blob = await response.blob(), objectUrl = URL.createObjectURL(blob);
-  try {
-    return await new Promise((resolve, reject) => {
-      const img = new Image(); img.onload = () => resolve(img); img.onerror = reject; img.src = objectUrl;
-    });
-  } finally { setTimeout(() => URL.revokeObjectURL(objectUrl), 1000); }
-}
+    setFrame(
+      firstAvailableFrame()
+    );
 
-function drawContain(ctx, img, x, y, w, h) {
-  const scale = Math.min(w/img.width, h/img.height), dw = img.width*scale, dh = img.height*scale;
-  ctx.drawImage(img, x+(w-dw)/2, y+(h-dh)/2, dw, dh);
-}
-
-async function createCombinedCanvas(fhr) {
-  const left = await fetchImage(leftImgSrc(fhr));
-  if (!isCompare()) {
-    const canvas = document.createElement("canvas"); canvas.width = left.width; canvas.height = left.height;
-    canvas.getContext("2d").drawImage(left,0,0); return canvas;
   }
-  const right = await fetchImage(rightImgSrc(fhr));
-  const w = Math.max(left.width,right.width), h = Math.max(left.height,right.height);
-  const canvas = document.createElement("canvas"); canvas.width = w*2; canvas.height = h;
-  const ctx = canvas.getContext("2d"); ctx.fillStyle="#000"; ctx.fillRect(0,0,canvas.width,canvas.height);
-  drawContain(ctx,left,0,0,w,h); drawContain(ctx,right,w,0,w,h); return canvas;
+
+  else {
+
+    setFrame(
+      current
+    );
+
+  }
+
 }
+
+
+// =============================================================
+// DOWNLOAD NAME
+// =============================================================
+
+function downloadName(
+  ext,
+  start=null,
+  end=null
+) {
+
+  let base;
+
+
+  if (
+    selectedView
+    ===
+    "single"
+  ) {
+
+    base =
+      `${selectedModel}_${leftProduct}`;
+
+  }
+
+  else if (
+    selectedView
+    ===
+    "compare_products"
+  ) {
+
+    base =
+      `${selectedModel}_${leftProduct}_vs_${rightProduct}`;
+
+  }
+
+  else {
+
+    base =
+      `${selectedModel}_${leftProduct}_vs_${rightModel}_${rightProduct}`;
+
+  }
+
+
+  base +=
+    `_${selectedRun}_${selectedDomain}`;
+
+
+  base +=
+    start !== null
+    ?
+    `_f${String(start).padStart(3,"0")}-f${String(end).padStart(3,"0")}`
+    :
+    `_f${String(current).padStart(3,"0")}`;
+
+
+  return (
+    base
+    +
+    "."
+    +
+    ext
+  );
+
+}
+
+
+// =============================================================
+// DOWNLOAD BLOB
+// =============================================================
+
+function downloadBlob(
+  blob,
+  filename
+) {
+
+  const url =
+    URL.createObjectURL(
+      blob
+    );
+
+
+  const a =
+    document.createElement(
+      "a"
+    );
+
+
+  a.href =
+    url;
+
+
+  a.download =
+    filename;
+
+
+  document.body.appendChild(
+    a
+  );
+
+
+  a.click();
+
+
+  a.remove();
+
+
+  setTimeout(
+    () =>
+      URL.revokeObjectURL(
+        url
+      ),
+    1000
+  );
+
+}
+
+
+// =============================================================
+// FETCH IMAGE
+// =============================================================
+
+async function fetchImage(
+  url
+) {
+
+  const response =
+    await fetch(
+      url
+    );
+
+
+  if (
+    !response.ok
+  ) {
+
+    throw new Error(
+      "Image fetch failed"
+    );
+
+  }
+
+
+  const blob =
+    await response.blob();
+
+
+  const objectUrl =
+    URL.createObjectURL(
+      blob
+    );
+
+
+  try {
+
+    return await new Promise(
+      (
+        resolve,
+        reject
+      ) => {
+
+        const img =
+          new Image();
+
+
+        img.onload =
+          () =>
+            resolve(
+              img
+            );
+
+
+        img.onerror =
+          reject;
+
+
+        img.src =
+          objectUrl;
+
+      }
+    );
+
+  }
+
+  finally {
+
+    setTimeout(
+      () =>
+        URL.revokeObjectURL(
+          objectUrl
+        ),
+      1000
+    );
+
+  }
+
+}
+
+
+// =============================================================
+// DRAW CONTAIN
+// =============================================================
+
+function drawContain(
+  ctx,
+  img,
+  x,
+  y,
+  w,
+  h
+) {
+
+  const scale =
+    Math.min(
+      w / img.width,
+      h / img.height
+    );
+
+
+  const dw =
+    img.width
+    *
+    scale;
+
+
+  const dh =
+    img.height
+    *
+    scale;
+
+
+  ctx.drawImage(
+    img,
+    x + (w - dw) / 2,
+    y + (h - dh) / 2,
+    dw,
+    dh
+  );
+
+}
+
+
+// =============================================================
+// CREATE COMBINED CANVAS
+// =============================================================
+
+async function createCombinedCanvas(
+  fhr
+) {
+
+  const left =
+    await fetchImage(
+      leftImgSrc(
+        fhr
+      )
+    );
+
+
+  if (
+    !isCompare()
+  ) {
+
+    const canvas =
+      document.createElement(
+        "canvas"
+      );
+
+
+    canvas.width =
+      left.width;
+
+
+    canvas.height =
+      left.height;
+
+
+    canvas
+      .getContext(
+        "2d"
+      )
+      .drawImage(
+        left,
+        0,
+        0
+      );
+
+
+    return canvas;
+
+  }
+
+
+  const right =
+    await fetchImage(
+      rightImgSrc(
+        fhr
+      )
+    );
+
+
+  const w =
+    Math.max(
+      left.width,
+      right.width
+    );
+
+
+  const h =
+    Math.max(
+      left.height,
+      right.height
+    );
+
+
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
+
+
+  canvas.width =
+    w * 2;
+
+
+  canvas.height =
+    h;
+
+
+  const ctx =
+    canvas.getContext(
+      "2d"
+    );
+
+
+  ctx.fillStyle =
+    "#000";
+
+
+  ctx.fillRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+
+  drawContain(
+    ctx,
+    left,
+    0,
+    0,
+    w,
+    h
+  );
+
+
+  drawContain(
+    ctx,
+    right,
+    w,
+    0,
+    w,
+    h
+  );
+
+
+  return canvas;
+
+}
+
+
+// =============================================================
+// SAVE PNG
+// =============================================================
 
 async function savePNG() {
-  if (!selectedRun || !availableFrames.includes(current)) return alert("No available frame is currently displayed.");
-  savePngBtn.disabled = true; saveStatus.textContent = "Saving PNG...";
+
+  if (
+    !selectedRun
+    ||
+    !availableFrames.includes(
+      current
+    )
+  ) {
+
+    return alert(
+      "No available frame is currently displayed."
+    );
+
+  }
+
+
+  savePngBtn.disabled =
+    true;
+
+
+  saveStatus.textContent =
+    "Saving PNG...";
+
+
   try {
-    const canvas = await createCombinedCanvas(current);
-    canvas.toBlob(blob => { if (blob) downloadBlob(blob, downloadName("png")); }, "image/png");
-    saveStatus.textContent = "PNG saved";
-  } catch(err) { console.error(err); alert("The PNG could not be created."); saveStatus.textContent=""; }
-  finally { savePngBtn.disabled=false; setTimeout(()=>{if(!creatingGif) saveStatus.textContent="";},2500); }
+
+    const canvas =
+      await createCombinedCanvas(
+        current
+      );
+
+
+    canvas.toBlob(
+      blob => {
+
+        if (
+          blob
+        ) {
+
+          downloadBlob(
+            blob,
+            downloadName(
+              "png"
+            )
+          );
+
+        }
+
+      },
+
+      "image/png"
+    );
+
+
+    saveStatus.textContent =
+      "PNG saved";
+
+  }
+
+  catch (
+    err
+  ) {
+
+    console.error(
+      err
+    );
+
+
+    alert(
+      "The PNG could not be created."
+    );
+
+
+    saveStatus.textContent =
+      "";
+
+  }
+
+  finally {
+
+    savePngBtn.disabled =
+      false;
+
+
+    setTimeout(
+      () => {
+
+        if (
+          !creatingGif
+        ) {
+
+          saveStatus.textContent =
+            "";
+
+        }
+
+      },
+
+      2500
+    );
+
+  }
+
 }
 
-function setGifDisabled(v) { [saveGifBtn,savePngBtn,gifStart,gifEnd,gifDelay,gifLoop].forEach(el=>el.disabled=v); }
+
+// =============================================================
+// DISABLE GIF CONTROLS
+// =============================================================
+
+function setGifDisabled(
+  v
+) {
+
+  [
+    saveGifBtn,
+    savePngBtn,
+    gifStart,
+    gifEnd,
+    gifDelay,
+    gifLoop
+  ]
+  .forEach(
+    el =>
+      el.disabled = v
+  );
+
+}
+
+
+// =============================================================
+// SAVE GIF
+// =============================================================
 
 async function saveGIF() {
-  if (creatingGif) return;
-  if (typeof GIF === "undefined") return alert("gif.js did not load.");
-  const start=Number(gifStart.value), end=Number(gifEnd.value);
-  const frames=availableFrames.filter(f=>f>=start&&f<=end);
-  if (!frames.length) return alert("No available frames were found in the selected GIF range.");
-  creatingGif=true; setGifDisabled(true);
-  const delay=Number(gifDelay.value);
-  const gif=new GIF({workers:2,quality:10,repeat:gifLoop.checked?0:-1,workerScript:"assets/gif.worker.js"});
-  try {
-    for(let i=0;i<frames.length;i++) {
-      const f=frames[i]; saveGifBtn.textContent=`Loading ${i+1}/${frames.length}`; saveStatus.textContent=`Loading ${formatFhr(f)}`;
-      const canvas=await createCombinedCanvas(f);
-      gif.addFrame(canvas,{copy:true,delay:i===frames.length-1?Math.max(delay,1000):delay});
-    }
-    saveGifBtn.textContent="Creating...";
-    gif.on("progress",p=>saveStatus.textContent=`Rendering ${Math.round(p*100)}%`);
-    gif.on("finished",blob=>{
-      downloadBlob(blob,downloadName("gif",start,end)); creatingGif=false; setGifDisabled(false);
-      saveGifBtn.textContent="Save GIF"; saveStatus.textContent="GIF saved"; setTimeout(()=>saveStatus.textContent="",2500);
-    });
-    gif.render();
-  } catch(err) {
-    console.error(err); creatingGif=false; setGifDisabled(false); saveGifBtn.textContent="Save GIF"; saveStatus.textContent="";
-    alert("The GIF could not be created.");
+
+  if (
+    creatingGif
+  ) {
+
+    return;
+
   }
+
+
+  if (
+    typeof GIF
+    ===
+    "undefined"
+  ) {
+
+    return alert(
+      "gif.js did not load."
+    );
+
+  }
+
+
+  const start =
+    Number(
+      gifStart.value
+    );
+
+
+  const end =
+    Number(
+      gifEnd.value
+    );
+
+
+  const frames =
+    availableFrames.filter(
+      f =>
+        f >= start
+        &&
+        f <= end
+    );
+
+
+  if (
+    !frames.length
+  ) {
+
+    return alert(
+      "No available frames were found in the selected GIF range."
+    );
+
+  }
+
+
+  creatingGif =
+    true;
+
+
+  setGifDisabled(
+    true
+  );
+
+
+  const delay =
+    Number(
+      gifDelay.value
+    );
+
+
+  const gif =
+    new GIF({
+
+      workers:
+        2,
+
+      quality:
+        10,
+
+      repeat:
+        gifLoop.checked
+        ?
+        0
+        :
+        -1,
+
+      workerScript:
+        "assets/gif.worker.js"
+
+    });
+
+
+  try {
+
+    for (
+      let i = 0;
+      i < frames.length;
+      i++
+    ) {
+
+      const f =
+        frames[i];
+
+
+      saveGifBtn.textContent =
+        `Loading ${i + 1}/${frames.length}`;
+
+
+      saveStatus.textContent =
+        `Loading ${formatFhr(f)}`;
+
+
+      const canvas =
+        await createCombinedCanvas(
+          f
+        );
+
+
+      gif.addFrame(
+        canvas,
+        {
+          copy:
+            true,
+
+          delay:
+            i === frames.length - 1
+            ?
+            Math.max(
+              delay,
+              1000
+            )
+            :
+            delay
+        }
+      );
+
+    }
+
+
+    saveGifBtn.textContent =
+      "Creating...";
+
+
+    gif.on(
+      "progress",
+      p => {
+
+        saveStatus.textContent =
+          `Rendering ${Math.round(p * 100)}%`;
+
+      }
+    );
+
+
+    gif.on(
+      "finished",
+      blob => {
+
+        downloadBlob(
+          blob,
+          downloadName(
+            "gif",
+            start,
+            end
+          )
+        );
+
+
+        creatingGif =
+          false;
+
+
+        setGifDisabled(
+          false
+        );
+
+
+        saveGifBtn.textContent =
+          "Save GIF";
+
+
+        saveStatus.textContent =
+          "GIF saved";
+
+
+        setTimeout(
+          () =>
+            saveStatus.textContent = "",
+          2500
+        );
+
+      }
+    );
+
+
+    gif.render();
+
+  }
+
+  catch (
+    err
+  ) {
+
+    console.error(
+      err
+    );
+
+
+    creatingGif =
+      false;
+
+
+    setGifDisabled(
+      false
+    );
+
+
+    saveGifBtn.textContent =
+      "Save GIF";
+
+
+    saveStatus.textContent =
+      "";
+
+
+    alert(
+      "The GIF could not be created."
+    );
+
+  }
+
 }
 
-gifStart.addEventListener("input",()=>{if(Number(gifStart.value)>Number(gifEnd.value))gifEnd.value=gifStart.value;syncGifRangeLabels();});
-gifEnd.addEventListener("input",()=>{if(Number(gifEnd.value)<Number(gifStart.value))gifStart.value=gifEnd.value;syncGifRangeLabels();});
+
+// =============================================================
+// GIF SLIDERS
+// =============================================================
+
+gifStart.addEventListener(
+  "input",
+  () => {
+
+    if (
+      Number(
+        gifStart.value
+      )
+      >
+      Number(
+        gifEnd.value
+      )
+    ) {
+
+      gifEnd.value =
+        gifStart.value;
+
+    }
+
+
+    syncGifRangeLabels();
+
+  }
+);
+
+
+gifEnd.addEventListener(
+  "input",
+  () => {
+
+    if (
+      Number(
+        gifEnd.value
+      )
+      <
+      Number(
+        gifStart.value
+      )
+    ) {
+
+      gifStart.value =
+        gifEnd.value;
+
+    }
+
+
+    syncGifRangeLabels();
+
+  }
+);
+
+
+// =============================================================
+// INIT
+// =============================================================
 
 async function init() {
-  updateProductOptions(); updateVisibility(); updateTitle();
-  await refreshViewer(); setFrame(firstAvailableFrame());
-  setInterval(async()=>{if(!creatingGif)await refreshViewer();},30000);
+
+  updateProductOptions();
+
+  updateVisibility();
+
+  updateTitle();
+
+
+  await refreshViewer();
+
+
+  setFrame(
+    firstAvailableFrame()
+  );
+
+
+  setInterval(
+    async () => {
+
+      if (
+        !creatingGif
+      ) {
+
+        await refreshViewer();
+
+      }
+
+    },
+
+    30000
+
+  );
+
 }
+
+
 init();
+
+
 </script>
 
-</body>
-</html>
 
 </body>
+
 </html>
