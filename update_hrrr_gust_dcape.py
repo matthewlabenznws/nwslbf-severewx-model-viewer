@@ -2738,7 +2738,7 @@ def plot_domain_from_fields(
                     f"{int(x)}",
 
                 fontsize=
-                    7.2
+                    5
             )
 
 
@@ -2758,7 +2758,7 @@ def plot_domain_from_fields(
 
                     pe.withStroke(
                         linewidth=
-                            2.1)
+                            0.8)
 
                 ])
 
