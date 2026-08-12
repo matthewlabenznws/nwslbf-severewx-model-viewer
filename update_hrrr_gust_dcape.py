@@ -2758,7 +2758,9 @@ def plot_domain_from_fields(
 
                     pe.withStroke(
                         linewidth=
-                            0.8)
+                            0.8,
+                    
+                    foreground="black")
 
                 ])
 
