@@ -4,12 +4,13 @@
 # Reflectivity + UH + Sim IR + Theta Cold Pools
 # + 4–6 km Storm-Relative Winds
 #
-# NEW RRFS PUBLIC FEED:
+# SOURCE:
+# https://nomads.ncep.noaa.gov/pub/data/nccf/com/rrfs/para/
 #
-# https://noaa-rrfs-pds.s3.amazonaws.com/
-# rrfs_public/rrfs.YYYYMMDD/HH/
-#
-# This is NOAA's public/operational-style RRFS feed.
+# IMPORTANT:
+# NOMADS parallel RRFS files are downloaded as full GRIB2 files.
+# The needed messages are extracted directly with ecCodes.
+# Large GRIB2 files are deleted after each forecast hour.
 #
 # Uploads:
 # runs/cams/rrfs/refl_uh/
@@ -22,6 +23,7 @@
 
 import os
 import re
+import gc
 import json
 import time
 import zipfile
@@ -29,8 +31,6 @@ import requests
 import boto3
 
 import numpy as np
-import xarray as xr
-
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import matplotlib.patheffects as pe
@@ -58,6 +58,13 @@ from datetime import (
 from matplotlib.colors import (
     ListedColormap,
     BoundaryNorm
+)
+
+from eccodes import (
+    codes_grib_new_from_file,
+    codes_get,
+    codes_get_array,
+    codes_release
 )
 
 
@@ -122,7 +129,7 @@ if os.path.exists(
 
 DATA_DIR = os.path.join(
     BASE_DIR,
-    "rrfs_subsets"
+    "rrfs_full_grib"
 )
 
 
@@ -163,7 +170,7 @@ os.makedirs(
 
 
 # ============================================================
-# R2
+# R2 SETUP
 # ============================================================
 
 BUCKET = os.environ[
@@ -208,6 +215,7 @@ def upload_to_r2(
         }
     )
 
+
     print(
         "Uploaded to R2:",
         remote_key
@@ -215,7 +223,7 @@ def upload_to_r2(
 
 
 # ============================================================
-# DOMAINS
+# DOMAIN CONFIG
 # ============================================================
 
 DOMAINS = {
@@ -298,7 +306,7 @@ DOMAINS = {
 
 
 # ============================================================
-# SPC SEVERE DOMAIN
+# DYNAMIC SPC SEVERE DOMAIN
 # ============================================================
 
 SPC_DAY1_CAT_URL = (
@@ -446,9 +454,7 @@ def add_spc_severe_domain():
             gdf[
                 risk_col
             ]
-            .astype(
-                str
-            )
+            .astype(str)
             .str
             .upper()
         )
@@ -541,10 +547,8 @@ def add_spc_severe_domain():
             [
                 main_poly
             ],
-            geometry=
-                "geometry",
-            crs=
-                "EPSG:4326"
+            geometry="geometry",
+            crs="EPSG:4326"
         )
 
 
@@ -561,8 +565,7 @@ def add_spc_severe_domain():
         centroid_ll = (
             gpd.GeoSeries(
                 centroid_proj,
-                crs=
-                    "EPSG:5070"
+                crs="EPSG:5070"
             )
             .to_crs(
                 epsg=4326
@@ -571,41 +574,27 @@ def add_spc_severe_domain():
         )
 
 
-        center_lon = (
-            centroid_ll.x
-        )
-
-
-        center_lat = (
-            centroid_ll.y
-        )
+        center_lon = centroid_ll.x
+        center_lat = centroid_ll.y
 
 
         extent = [
 
             center_lon
             -
-            SEVERE_DOMAIN_WIDTH
-            /
-            2,
+            SEVERE_DOMAIN_WIDTH / 2,
 
             center_lon
             +
-            SEVERE_DOMAIN_WIDTH
-            /
-            2,
+            SEVERE_DOMAIN_WIDTH / 2,
 
             center_lat
             -
-            SEVERE_DOMAIN_HEIGHT
-            /
-            2,
+            SEVERE_DOMAIN_HEIGHT / 2,
 
             center_lat
             +
-            SEVERE_DOMAIN_HEIGHT
-            /
-            2,
+            SEVERE_DOMAIN_HEIGHT / 2,
 
         ]
 
@@ -615,10 +604,7 @@ def add_spc_severe_domain():
         ] = {
 
             "label":
-                (
-                    f"SPC "
-                    f"{highest_label} Risk"
-                ),
+                f"SPC {highest_label} Risk",
 
             "extent":
                 extent,
@@ -650,7 +636,7 @@ def add_spc_severe_domain():
     except Exception as e:
 
         print(
-            "SPC severe domain skipped "
+            f"SPC severe domain skipped "
             f"due to error: {e}"
         )
 
@@ -659,32 +645,18 @@ add_spc_severe_domain()
 
 
 # ============================================================
-# RRFS SETTINGS
+# SETTINGS
 # ============================================================
 
-# The public RRFS feed currently uses:
-#
-# 00 / 03 / 06 / 09 / 12 / 15 / 18 / 21 UTC
-#
-# instead of every hourly cycle.
-
-VALID_RRFS_CYCLES = [
-    0,
-    3,
-    6,
-    9,
-    12,
-    15,
-    18,
-    21
-]
+VALID_RRFS_CYCLES = list(
+    range(24)
+)
 
 
 START_FHR = 1
 
 
-# More conservative delay than old prototype feed.
-CYCLE_DELAY_MINUTES = 90
+CYCLE_DELAY_MINUTES = 45
 
 
 LONG_CYCLE_HOURS = [
@@ -708,17 +680,31 @@ MANUAL_STORM_MOTION_SPEED_KT = 35
 PLOT_SR_WIND_BARBS = True
 
 
-# ============================================================
-# DOWNLOAD RETRIES
-# ============================================================
+# ------------------------------------------------------------
+# DOWNLOAD SETTINGS
+# ------------------------------------------------------------
 
 DOWNLOAD_ATTEMPTS = 3
 
-DOWNLOAD_RETRY_SECONDS = 10
+DOWNLOAD_RETRY_SECONDS = 15
+
+
+# Remove large NOMADS GRIB files after each forecast hour.
+DELETE_GRIB_AFTER_HOUR = True
 
 
 # ============================================================
-# REFLECTIVITY COLORS
+# RRFS NOMADS BASE
+# ============================================================
+
+RRFS_NOMADS_BASE = (
+    "https://nomads.ncep.noaa.gov/"
+    "pub/data/nccf/com/rrfs/para"
+)
+
+
+# ============================================================
+# REFLECTIVITY COLOR TABLE
 # ============================================================
 
 bounds = [
@@ -795,8 +781,7 @@ colors = [
 
 cmap = ListedColormap(
     colors,
-    name=
-        "reflec_bins"
+    name="reflec_bins"
 )
 
 
@@ -917,119 +902,1511 @@ def wind_from_dir_speed_to_uv(
     )
 
 
-def get_lat_lon(
-    da
+# ============================================================
+# RRFS URL BUILDER
+# ============================================================
+
+def rrfs_grib_url(
+    init_dt,
+    fhr,
+    product="2dfld"
 ):
 
-    if (
-        "latitude"
-        in da.coords
-        and
-        "longitude"
-        in da.coords
-    ):
+    ymd = init_dt.strftime(
+        "%Y%m%d"
+    )
 
-        lat = np.asarray(
-            da.latitude.values
+
+    hh = init_dt.strftime(
+        "%H"
+    )
+
+
+    if product == "2dfld":
+
+        fname = (
+            f"rrfs.t{hh}z."
+            f"2dfld.3km."
+            f"f{fhr:03d}."
+            f"conus.grib2"
         )
 
 
-        lon = to_lon180(
-            da.longitude.values
-        )
+    elif product == "prslev":
 
-
-    elif (
-        "lat"
-        in da.coords
-        and
-        "lon"
-        in da.coords
-    ):
-
-        lat = np.asarray(
-            da.lat.values
-        )
-
-
-        lon = to_lon180(
-            da.lon.values
+        fname = (
+            f"rrfs.t{hh}z."
+            f"prslev.3km."
+            f"f{fhr:03d}."
+            f"conus.grib2"
         )
 
 
     else:
 
-        raise RuntimeError(
-            "Could not find "
-            "latitude/longitude coordinates."
-        )
-
-
-    lat = np.squeeze(
-        lat
-    )
-
-
-    lon = np.squeeze(
-        lon
-    )
-
-
-    if (
-        lat.ndim != 2
-        or
-        lon.ndim != 2
-    ):
-
-        raise RuntimeError(
-            f"Lat/lon not 2D. "
-            f"lat={lat.shape}, "
-            f"lon={lon.shape}"
+        raise ValueError(
+            "product must be "
+            "'2dfld' or 'prslev'"
         )
 
 
     return (
+        f"{RRFS_NOMADS_BASE}/"
+        f"rrfs.{ymd}/"
+        f"{hh}/"
+        f"{fname}"
+    )
+
+
+# ============================================================
+# URL EXISTS
+#
+# Opens the request as a stream and immediately closes it.
+# It does NOT download the complete GRIB.
+# ============================================================
+
+def url_exists(
+    url,
+    timeout=15
+):
+
+    try:
+
+        with requests.get(
+            url,
+            stream=True,
+            timeout=timeout
+        ) as r:
+
+            return (
+                r.status_code
+                ==
+                200
+            )
+
+
+    except Exception:
+
+        return False
+
+
+# ============================================================
+# FIND LATEST RRFS CYCLE
+# ============================================================
+
+def find_latest_available_rrfs_cycle(
+    max_back_hours=48
+):
+
+    now = (
+        datetime.now(
+            timezone.utc
+        )
+        -
+        timedelta(
+            minutes=
+                CYCLE_DELAY_MINUTES
+        )
+    )
+
+
+    print("")
+    print("=" * 70)
+    print(
+        "SEARCHING FOR LATEST "
+        "RRFS PARALLEL CYCLE"
+    )
+    print("=" * 70)
+
+
+    for back in range(
+        max_back_hours + 1
+    ):
+
+        dt = (
+            now
+            -
+            timedelta(
+                hours=back
+            )
+        )
+
+
+        if (
+            dt.hour
+            not in
+            VALID_RRFS_CYCLES
+        ):
+
+            continue
+
+
+        dt = dt.replace(
+            minute=0,
+            second=0,
+            microsecond=0,
+            tzinfo=None
+        )
+
+
+        test_url = rrfs_grib_url(
+            dt,
+            1,
+            product="2dfld"
+        )
+
+
+        print(
+            f"Checking RRFS "
+            f"{dt:%Y%m%d %HZ}..."
+        )
+
+
+        if url_exists(
+            test_url
+        ):
+
+            print("")
+            print(
+                f"Latest RRFS cycle found: "
+                f"{dt:%Y%m%d %HZ}"
+            )
+
+
+            print(
+                "Matched GRIB:",
+                test_url
+            )
+
+
+            return dt
+
+
+    raise RuntimeError(
+        "Could not find recent "
+        "RRFS parallel cycle."
+    )
+
+
+# ============================================================
+# FULL GRIB DOWNLOAD
+# ============================================================
+
+def download_full_grib(
+    init_dt,
+    fhr,
+    product
+):
+
+    url = rrfs_grib_url(
+        init_dt,
+        fhr,
+        product=product
+    )
+
+
+    filename = os.path.basename(
+        url
+    )
+
+
+    outpath = os.path.join(
+        DATA_DIR,
+        filename
+    )
+
+
+    if (
+        os.path.exists(
+            outpath
+        )
+        and
+        os.path.getsize(
+            outpath
+        )
+        >
+        1_000_000
+    ):
+
+        print(
+            "Using cached GRIB:",
+            outpath
+        )
+
+
+        return outpath
+
+
+    last_error = None
+
+
+    for attempt in range(
+        1,
+        DOWNLOAD_ATTEMPTS + 1
+    ):
+
+        try:
+
+            print("")
+            print(
+                f"Downloading {product} "
+                f"F{fhr:03d}"
+            )
+
+
+            print(
+                url
+            )
+
+
+            print(
+                f"Attempt "
+                f"{attempt}/"
+                f"{DOWNLOAD_ATTEMPTS}"
+            )
+
+
+            with requests.get(
+                url,
+                stream=True,
+                timeout=180
+            ) as r:
+
+                r.raise_for_status()
+
+
+                total_bytes = 0
+
+
+                with open(
+                    outpath,
+                    "wb"
+                ) as f:
+
+                    for chunk in r.iter_content(
+                        chunk_size=
+                            8
+                            *
+                            1024
+                            *
+                            1024
+                    ):
+
+                        if not chunk:
+
+                            continue
+
+
+                        f.write(
+                            chunk
+                        )
+
+
+                        total_bytes += len(
+                            chunk
+                        )
+
+
+                        if (
+                            total_bytes
+                            %
+                            (
+                                100
+                                *
+                                1024
+                                *
+                                1024
+                            )
+                            <
+                            len(
+                                chunk
+                            )
+                        ):
+
+                            print(
+                                f"  "
+                                f"{total_bytes / 1024 / 1024:.0f} MB"
+                            )
+
+
+            if (
+                not os.path.exists(
+                    outpath
+                )
+                or
+                os.path.getsize(
+                    outpath
+                )
+                <
+                1_000_000
+            ):
+
+                raise RuntimeError(
+                    "Downloaded GRIB "
+                    "appears incomplete."
+                )
+
+
+            print(
+                "Downloaded:",
+                outpath
+            )
+
+
+            print(
+                f"Size: "
+                f"{os.path.getsize(outpath) / 1024 / 1024:.1f} MB"
+            )
+
+
+            return outpath
+
+
+        except Exception as e:
+
+            last_error = e
+
+
+            print(
+                f"Download failed: "
+                f"{e}"
+            )
+
+
+            if os.path.exists(
+                outpath
+            ):
+
+                try:
+
+                    os.remove(
+                        outpath
+                    )
+
+                except Exception:
+
+                    pass
+
+
+            if (
+                attempt
+                <
+                DOWNLOAD_ATTEMPTS
+            ):
+
+                print(
+                    f"Retrying in "
+                    f"{DOWNLOAD_RETRY_SECONDS} seconds..."
+                )
+
+
+                time.sleep(
+                    DOWNLOAD_RETRY_SECONDS
+                )
+
+
+    raise RuntimeError(
+        f"Could not download "
+        f"{product} F{fhr:03d}. "
+        f"Last error: {last_error}"
+    )
+
+
+# ============================================================
+# SAFE ECCODES GET
+# ============================================================
+
+def safe_codes_get(
+    gid,
+    key,
+    default=""
+):
+
+    try:
+
+        return codes_get(
+            gid,
+            key
+        )
+
+
+    except Exception:
+
+        return default
+
+
+# ============================================================
+# BUILD SEARCHABLE GRIB MESSAGE DESCRIPTION
+#
+# This lets us retain search terms similar to the old IDX
+# workflow even though we're scanning GRIB messages directly.
+# ============================================================
+
+def grib_message_description(
+    gid
+):
+
+    short_name = str(
+        safe_codes_get(
+            gid,
+            "shortName",
+            ""
+        )
+    )
+
+
+    name = str(
+        safe_codes_get(
+            gid,
+            "name",
+            ""
+        )
+    )
+
+
+    parameter_name = str(
+        safe_codes_get(
+            gid,
+            "parameterName",
+            ""
+        )
+    )
+
+
+    type_level = str(
+        safe_codes_get(
+            gid,
+            "typeOfLevel",
+            ""
+        )
+    )
+
+
+    level = safe_codes_get(
+        gid,
+        "level",
+        ""
+    )
+
+
+    top_level = safe_codes_get(
+        gid,
+        "topLevel",
+        ""
+    )
+
+
+    bottom_level = safe_codes_get(
+        gid,
+        "bottomLevel",
+        ""
+    )
+
+
+    step_type = str(
+        safe_codes_get(
+            gid,
+            "stepType",
+            ""
+        )
+    )
+
+
+    pieces = [
+
+        short_name,
+        short_name.upper(),
+
+        name,
+        parameter_name,
+
+        type_level,
+
+        str(
+            level
+        ),
+
+        str(
+            top_level
+        ),
+
+        str(
+            bottom_level
+        ),
+
+        step_type,
+
+    ]
+
+
+    # --------------------------------------------------------
+    # ADD OLD-GRIB/IDX STYLE ALIASES
+    # --------------------------------------------------------
+
+    s = short_name.lower()
+
+
+    if s in (
+        "u",
+        "ugrd"
+    ):
+
+        pieces.extend(
+            [
+                "UGRD",
+                "U component of wind"
+            ]
+        )
+
+
+    if s in (
+        "v",
+        "vgrd"
+    ):
+
+        pieces.extend(
+            [
+                "VGRD",
+                "V component of wind"
+            ]
+        )
+
+
+    if s in (
+        "t",
+        "2t",
+        "tmp"
+    ):
+
+        pieces.extend(
+            [
+                "TMP",
+                "temperature"
+            ]
+        )
+
+
+    if s in (
+        "sp",
+        "pres",
+        "prmsl"
+    ):
+
+        pieces.extend(
+            [
+                "PRES",
+                "pressure"
+            ]
+        )
+
+
+    if (
+        "refd"
+        in s
+    ):
+
+        pieces.append(
+            "REFD"
+        )
+
+
+    if (
+        "refc"
+        in s
+    ):
+
+        pieces.append(
+            "REFC"
+        )
+
+
+    if (
+        "mxuphl"
+        in s
+        or
+        "updraft helicity"
+        in name.lower()
+    ):
+
+        pieces.append(
+            "MXUPHL"
+        )
+
+
+    # --------------------------------------------------------
+    # HUMAN-READABLE LEVEL ALIASES
+    # --------------------------------------------------------
+
+    if (
+        type_level
+        ==
+        "heightAboveGround"
+    ):
+
+        pieces.extend(
+            [
+                f"{level} m",
+                f"{level} m above ground"
+            ]
+        )
+
+
+    if (
+        "isobaric"
+        in
+        type_level.lower()
+    ):
+
+        pieces.extend(
+            [
+                f"{level} mb",
+                f"{level} hPa"
+            ]
+        )
+
+
+    # Layer aliases helpful for UH
+    if (
+        top_level != ""
+        and
+        bottom_level != ""
+    ):
+
+        pieces.extend(
+            [
+                f"{top_level}-{bottom_level}",
+                f"{bottom_level}-{top_level}",
+                f"{top_level} - {bottom_level}",
+                f"{bottom_level} - {top_level}"
+            ]
+        )
+
+
+    return " | ".join(
+        str(
+            x
+        )
+        for x
+        in pieces
+    )
+
+
+# ============================================================
+# MATCH OLD TERM SETS AGAINST A GRIB MESSAGE
+# ============================================================
+
+def matches_term_set(
+    description,
+    terms
+):
+
+    desc_lower = (
+        description
+        .lower()
+    )
+
+
+    return all(
+        term.lower()
+        in
+        desc_lower
+
+        for term
+        in terms
+    )
+
+
+# ============================================================
+# DETERMINE GRIB GRID SHAPE
+# ============================================================
+
+def get_grib_shape(
+    gid,
+    values
+):
+
+    nx = safe_codes_get(
+        gid,
+        "Nx",
+        None
+    )
+
+
+    ny = safe_codes_get(
+        gid,
+        "Ny",
+        None
+    )
+
+
+    if (
+        nx in (
+            None,
+            "",
+            0
+        )
+        or
+        ny in (
+            None,
+            "",
+            0
+        )
+    ):
+
+        nx = safe_codes_get(
+            gid,
+            "Ni",
+            None
+        )
+
+
+        ny = safe_codes_get(
+            gid,
+            "Nj",
+            None
+        )
+
+
+    if (
+        nx in (
+            None,
+            "",
+            0
+        )
+        or
+        ny in (
+            None,
+            "",
+            0
+        )
+    ):
+
+        raise RuntimeError(
+            "Could not determine "
+            "GRIB grid dimensions."
+        )
+
+
+    nx = int(
+        nx
+    )
+
+
+    ny = int(
+        ny
+    )
+
+
+    if (
+        nx
+        *
+        ny
+        !=
+        len(
+            values
+        )
+    ):
+
+        raise RuntimeError(
+            f"GRIB dimensions "
+            f"{ny}x{nx} do not equal "
+            f"value count {len(values)}."
+        )
+
+
+    return (
+        ny,
+        nx
+    )
+
+
+# ============================================================
+# EXTRACT ARRAY + LAT/LON FROM MESSAGE
+# ============================================================
+
+def message_to_arrays(
+    gid
+):
+
+    values = np.asarray(
+        codes_get_array(
+            gid,
+            "values"
+        ),
+        dtype=float
+    )
+
+
+    latitudes = np.asarray(
+        codes_get_array(
+            gid,
+            "latitudes"
+        ),
+        dtype=float
+    )
+
+
+    longitudes = np.asarray(
+        codes_get_array(
+            gid,
+            "longitudes"
+        ),
+        dtype=float
+    )
+
+
+    (
+        ny,
+        nx
+    ) = get_grib_shape(
+        gid,
+        values
+    )
+
+
+    field = values.reshape(
+        ny,
+        nx
+    )
+
+
+    lat = latitudes.reshape(
+        ny,
+        nx
+    )
+
+
+    lon = longitudes.reshape(
+        ny,
+        nx
+    )
+
+
+    lon = to_lon180(
+        lon
+    )
+
+
+    return (
+        field,
         lat,
         lon
     )
 
 
-def ensure_2d_field(
-    da,
-    label
-):
+# ============================================================
+# FIELD SEARCH CONFIGURATION
+# ============================================================
 
-    arr = np.asarray(
-        da.values,
-        dtype=float
-    )
+TWO_D_FIELD_SEARCHES = {
 
+    "reflectivity": [
 
-    arr = np.squeeze(
-        arr
-    )
+        [
+            "REFD",
+            "1000 m"
+        ],
 
+        [
+            "REFC"
+        ],
 
-    if (
-        arr.ndim
-        !=
-        2
-    ):
+        [
+            "REFD"
+        ],
 
-        raise RuntimeError(
-            f"{label} is not 2D "
-            f"after squeeze. "
-            f"Shape={arr.shape}, "
-            f"dims="
-            f"{getattr(da, 'dims', None)}"
-        )
+    ],
 
 
-    return arr
+    "uh25": [
+
+        [
+            "MXUPHL",
+            "5000-2000"
+        ],
+
+        [
+            "MXUPHL",
+            "5000 - 2000"
+        ],
+
+        [
+            "MXUPHL"
+        ],
+
+    ],
+
+
+    "uh03": [
+
+        [
+            "MXUPHL",
+            "3000-0"
+        ],
+
+        [
+            "MXUPHL",
+            "3000 - 0"
+        ],
+
+    ],
+
+
+    "sim_ir": [
+
+        [
+            "SBT123"
+        ],
+
+        [
+            "SBT124"
+        ],
+
+        [
+            "brightness"
+        ],
+
+        [
+            "satellite"
+        ],
+
+    ],
+
+
+    "t2": [
+
+        [
+            "TMP",
+            "2 m above ground"
+        ],
+
+        [
+            "TMP",
+            "2 m"
+        ],
+
+        [
+            "2 metre temperature"
+        ],
+
+    ],
+
+
+    "psfc": [
+
+        [
+            "PRES",
+            "surface"
+        ],
+
+        [
+            "surface pressure"
+        ],
+
+    ],
+
+
+    "u_stm": [
+
+        [
+            "UEID"
+        ],
+
+        [
+            "USTM"
+        ],
+
+        [
+            "BUNK",
+            "U"
+        ],
+
+    ],
+
+
+    "v_stm": [
+
+        [
+            "VEID"
+        ],
+
+        [
+            "VSTM"
+        ],
+
+        [
+            "BUNK",
+            "V"
+        ],
+
+    ],
+
+}
+
+
+PRESSURE_FIELD_SEARCHES = {
+
+    "u700": [
+
+        [
+            "UGRD",
+            "700 mb"
+        ],
+
+    ],
+
+
+    "v700": [
+
+        [
+            "VGRD",
+            "700 mb"
+        ],
+
+    ],
+
+
+    "u600": [
+
+        [
+            "UGRD",
+            "600 mb"
+        ],
+
+    ],
+
+
+    "v600": [
+
+        [
+            "VGRD",
+            "600 mb"
+        ],
+
+    ],
+
+
+    "u500": [
+
+        [
+            "UGRD",
+            "500 mb"
+        ],
+
+    ],
+
+
+    "v500": [
+
+        [
+            "VGRD",
+            "500 mb"
+        ],
+
+    ],
+
+}
 
 
 # ============================================================
-# SHAPEFILES
+# SCAN ONE GRIB AND EXTRACT ALL REQUESTED FIELDS IN ONE PASS
+# ============================================================
+
+def extract_fields_from_grib(
+    path,
+    searches,
+    optional_fields=None
+):
+
+    if optional_fields is None:
+
+        optional_fields = set()
+
+
+    results = {}
+
+
+    print("")
+    print(
+        "Scanning GRIB:",
+        path
+    )
+
+
+    with open(
+        path,
+        "rb"
+    ) as f:
+
+        message_number = 0
+
+
+        while True:
+
+            gid = codes_grib_new_from_file(
+                f
+            )
+
+
+            if gid is None:
+
+                break
+
+
+            message_number += 1
+
+
+            try:
+
+                description = (
+                    grib_message_description(
+                        gid
+                    )
+                )
+
+
+                # ---------------------------------------------
+                # ONLY TEST FIELDS THAT HAVE NOT BEEN FOUND
+                # ---------------------------------------------
+
+                for field_name, term_sets in searches.items():
+
+                    if (
+                        field_name
+                        in
+                        results
+                    ):
+
+                        continue
+
+
+                    matched = False
+
+
+                    for terms in term_sets:
+
+                        if matches_term_set(
+                            description,
+                            terms
+                        ):
+
+                            (
+                                field,
+                                lat,
+                                lon
+                            ) = message_to_arrays(
+                                gid
+                            )
+
+
+                            results[
+                                field_name
+                            ] = {
+
+                                "field":
+                                    field,
+
+                                "lat":
+                                    lat,
+
+                                "lon":
+                                    lon,
+
+                                "description":
+                                    description,
+
+                            }
+
+
+                            print("")
+                            print(
+                                f"Matched "
+                                f"{field_name}:"
+                            )
+
+
+                            print(
+                                description
+                            )
+
+
+                            matched = True
+
+                            break
+
+
+                    if matched:
+
+                        continue
+
+
+                # ---------------------------------------------
+                # STOP EARLY IF EVERYTHING IS FOUND
+                # ---------------------------------------------
+
+                if (
+                    len(
+                        results
+                    )
+                    ==
+                    len(
+                        searches
+                    )
+                ):
+
+                    break
+
+
+            finally:
+
+                codes_release(
+                    gid
+                )
+
+
+    # ========================================================
+    # REPORT MISSING FIELDS
+    # ========================================================
+
+    missing_required = []
+
+
+    for field_name in searches:
+
+        if (
+            field_name
+            not in
+            results
+        ):
+
+            if (
+                field_name
+                in
+                optional_fields
+            ):
+
+                print(
+                    f"Optional field "
+                    f"{field_name} not found."
+                )
+
+
+            else:
+
+                missing_required.append(
+                    field_name
+                )
+
+
+    if missing_required:
+
+        raise RuntimeError(
+            "Required RRFS fields not found: "
+            +
+            ", ".join(
+                missing_required
+            )
+        )
+
+
+    return results
+
+
+# ============================================================
+# SPATIAL HELPERS
+# ============================================================
+
+def subset_2d(
+    lat,
+    lon,
+    *fields
+):
+
+    mask = (
+        np.isfinite(
+            lat
+        )
+        &
+        np.isfinite(
+            lon
+        )
+        &
+        (
+            lon >= LON_MIN
+        )
+        &
+        (
+            lon <= LON_MAX
+        )
+        &
+        (
+            lat >= LAT_MIN
+        )
+        &
+        (
+            lat <= LAT_MAX
+        )
+    )
+
+
+    if not np.any(
+        mask
+    ):
+
+        raise RuntimeError(
+            "No grid points found "
+            "inside selected domain."
+        )
+
+
+    iy, ix = np.where(
+        mask
+    )
+
+
+    iy0 = max(
+        iy.min() - 2,
+        0
+    )
+
+
+    iy1 = min(
+        iy.max() + 3,
+        lat.shape[
+            0
+        ]
+    )
+
+
+    ix0 = max(
+        ix.min() - 2,
+        0
+    )
+
+
+    ix1 = min(
+        ix.max() + 3,
+        lon.shape[
+            1
+        ]
+    )
+
+
+    return (
+
+        lat[
+            iy0:iy1,
+            ix0:ix1
+        ],
+
+        lon[
+            iy0:iy1,
+            ix0:ix1
+        ],
+
+        [
+            field[
+                iy0:iy1,
+                ix0:ix1
+            ]
+
+            for field
+            in fields
+        ]
+
+    )
+
+
+def interp_to_target_grid(
+    src_lat,
+    src_lon,
+    src_field,
+    tgt_lat,
+    tgt_lon
+):
+
+    src_points = np.column_stack(
+        (
+            src_lon.ravel(),
+            src_lat.ravel()
+        )
+    )
+
+
+    src_values = np.asarray(
+        src_field
+    ).ravel()
+
+
+    good = (
+        np.isfinite(
+            src_points[
+                :,
+                0
+            ]
+        )
+        &
+        np.isfinite(
+            src_points[
+                :,
+                1
+            ]
+        )
+        &
+        np.isfinite(
+            src_values
+        )
+    )
+
+
+    out = griddata(
+        src_points[
+            good
+        ],
+        src_values[
+            good
+        ],
+        (
+            tgt_lon,
+            tgt_lat
+        ),
+        method="linear"
+    )
+
+
+    if np.isnan(
+        out
+    ).any():
+
+        out_nearest = griddata(
+            src_points[
+                good
+            ],
+            src_values[
+                good
+            ],
+            (
+                tgt_lon,
+                tgt_lat
+            ),
+            method="nearest"
+        )
+
+
+        out = np.where(
+            np.isnan(
+                out
+            ),
+            out_nearest,
+            out
+        )
+
+
+    return out
+
+
+# ============================================================
+# SHAPEFILE HELPERS
 # ============================================================
 
 def add_shapefile_outline(
@@ -1157,7 +2534,8 @@ def get_lbf_cwa_geom(
 
         geoms = [
             r.geometry
-            for r in recs
+            for r
+            in recs
         ]
 
 
@@ -1238,1098 +2616,6 @@ def add_counties_clipped_to_cwa(
         zorder=
             zorder
     )
-
-
-# ============================================================
-# NEW RRFS PUBLIC AWS SOURCE
-# ============================================================
-
-RRFS_PUBLIC_BASE = (
-    "https://noaa-rrfs-pds."
-    "s3.amazonaws.com/"
-    "rrfs_public"
-)
-
-
-def rrfs_grib_url(
-    init_dt,
-    fhr,
-    product="2dfld"
-):
-
-    ymd = init_dt.strftime(
-        "%Y%m%d"
-    )
-
-
-    hh = init_dt.strftime(
-        "%H"
-    )
-
-
-    if product == "2dfld":
-
-        fname = (
-            f"rrfs.t{hh}z."
-            f"2dfld.3km."
-            f"f{fhr:03d}."
-            f"conus.grib2"
-        )
-
-
-    elif product == "prslev":
-
-        fname = (
-            f"rrfs.t{hh}z."
-            f"prslev.3km."
-            f"f{fhr:03d}."
-            f"conus.grib2"
-        )
-
-
-    else:
-
-        raise ValueError(
-            "product must be "
-            "'2dfld' or 'prslev'"
-        )
-
-
-    return (
-        f"{RRFS_PUBLIC_BASE}/"
-        f"rrfs.{ymd}/"
-        f"{hh}/"
-        f"{fname}"
-    )
-
-
-# ============================================================
-# HTTP EXISTS
-#
-# IMPORTANT:
-# Use GET with a one-byte range instead of HEAD.
-#
-# This avoids the NOMADS/HTTP HEAD behavior that caused the
-# previous cycle detector to miss files that actually existed.
-# ============================================================
-
-def url_exists(
-    url,
-    timeout=15
-):
-
-    try:
-
-        r = requests.get(
-            url,
-
-            headers={
-                "Range":
-                    "bytes=0-0"
-            },
-
-            timeout=
-                timeout,
-
-            stream=
-                True
-        )
-
-
-        return (
-            r.status_code
-            in
-            (
-                200,
-                206
-            )
-        )
-
-
-    except Exception:
-
-        return False
-
-
-# ============================================================
-# IDX AVAILABILITY
-# ============================================================
-
-def idx_exists(
-    grib_url
-):
-
-    idx_url = (
-        grib_url
-        +
-        ".idx"
-    )
-
-
-    try:
-
-        r = requests.get(
-            idx_url,
-            timeout=15
-        )
-
-
-        if (
-            r.status_code
-            ==
-            200
-            and
-            len(
-                r.text
-            )
-            >
-            10
-        ):
-
-            return True
-
-
-    except Exception:
-
-        pass
-
-
-    return False
-
-
-# ============================================================
-# FIND LATEST RRFS PUBLIC CYCLE
-# ============================================================
-
-def find_latest_available_rrfs_cycle(
-    max_back_hours=48
-):
-
-    now = (
-        datetime.now(
-            timezone.utc
-        )
-        -
-        timedelta(
-            minutes=
-                CYCLE_DELAY_MINUTES
-        )
-    )
-
-
-    print("")
-    print("=" * 70)
-    print(
-        "SEARCHING FOR LATEST "
-        "RRFS PUBLIC CYCLE"
-    )
-    print("=" * 70)
-
-
-    for back in range(
-        max_back_hours + 1
-    ):
-
-        dt = (
-            now
-            -
-            timedelta(
-                hours=back
-            )
-        )
-
-
-        if (
-            dt.hour
-            not in
-            VALID_RRFS_CYCLES
-        ):
-
-            continue
-
-
-        dt = dt.replace(
-            minute=0,
-            second=0,
-            microsecond=0,
-            tzinfo=None
-        )
-
-
-        grib_url = rrfs_grib_url(
-            dt,
-            1,
-            product=
-                "2dfld"
-        )
-
-
-        print(
-            f"Checking RRFS "
-            f"{dt:%Y%m%d %HZ}..."
-        )
-
-
-        if not url_exists(
-            grib_url
-        ):
-
-            continue
-
-
-        print(
-            "  GRIB exists."
-        )
-
-
-        if not idx_exists(
-            grib_url
-        ):
-
-            print(
-                "  GRIB found, "
-                "but IDX not yet available."
-            )
-
-            continue
-
-
-        print("")
-        print(
-            f"Latest RRFS cycle found: "
-            f"{dt:%Y%m%d %HZ}"
-        )
-
-
-        print(
-            "Matched:",
-            grib_url
-        )
-
-
-        return dt
-
-
-    raise RuntimeError(
-        "Could not find recent "
-        "RRFS public cycle with "
-        "GRIB + IDX files."
-    )
-
-
-# ============================================================
-# IDX
-# ============================================================
-
-def read_idx(
-    idx_url
-):
-
-    last_error = None
-
-
-    for attempt in range(
-        1,
-        DOWNLOAD_ATTEMPTS + 1
-    ):
-
-        try:
-
-            r = requests.get(
-                idx_url,
-                timeout=30
-            )
-
-
-            r.raise_for_status()
-
-
-            text = (
-                r.text
-                .strip()
-            )
-
-
-            if not text:
-
-                raise RuntimeError(
-                    "IDX file was empty."
-                )
-
-
-            return text.splitlines()
-
-
-        except Exception as e:
-
-            last_error = e
-
-
-            if (
-                attempt
-                <
-                DOWNLOAD_ATTEMPTS
-            ):
-
-                time.sleep(
-                    DOWNLOAD_RETRY_SECONDS
-                )
-
-
-    raise RuntimeError(
-        f"Could not read IDX: "
-        f"{idx_url}. "
-        f"{last_error}"
-    )
-
-
-def parse_idx_lines(
-    lines
-):
-
-    parsed = []
-
-
-    for i, line in enumerate(
-        lines
-    ):
-
-        parts = line.split(
-            ":"
-        )
-
-
-        if (
-            len(
-                parts
-            )
-            <
-            5
-        ):
-
-            continue
-
-
-        try:
-
-            msg_num = int(
-                parts[
-                    0
-                ]
-            )
-
-
-            start_byte = int(
-                parts[
-                    1
-                ]
-            )
-
-
-        except Exception:
-
-            continue
-
-
-        parsed.append({
-
-            "i":
-                i,
-
-            "line":
-                line,
-
-            "msg_num":
-                msg_num,
-
-            "start":
-                start_byte,
-
-        })
-
-
-    for j in range(
-        len(
-            parsed
-        )
-    ):
-
-        if (
-            j
-            <
-            len(
-                parsed
-            )
-            -
-            1
-        ):
-
-            parsed[
-                j
-            ][
-                "end"
-            ] = (
-                parsed[
-                    j + 1
-                ][
-                    "start"
-                ]
-                -
-                1
-            )
-
-
-        else:
-
-            parsed[
-                j
-            ][
-                "end"
-            ] = None
-
-
-    return parsed
-
-
-def find_idx_match(
-    parsed,
-    all_terms,
-    label
-):
-
-    all_terms_lower = [
-        t.lower()
-        for t
-        in all_terms
-    ]
-
-
-    matches = []
-
-
-    for item in parsed:
-
-        line_lower = (
-            item[
-                "line"
-            ]
-            .lower()
-        )
-
-
-        if all(
-            term
-            in
-            line_lower
-
-            for term
-            in
-            all_terms_lower
-        ):
-
-            matches.append(
-                item
-            )
-
-
-    if not matches:
-
-        sample = "\n".join(
-            [
-                p[
-                    "line"
-                ]
-                for p
-                in parsed[:150]
-            ]
-        )
-
-
-        raise RuntimeError(
-            f"Could not find "
-            f"{label} "
-            f"using terms "
-            f"{all_terms}.\n"
-            f"First 150 IDX lines:\n"
-            f"{sample}"
-        )
-
-
-    match = matches[
-        0
-    ]
-
-
-    print(
-        f"Matched {label}:"
-    )
-
-
-    print(
-        match[
-            "line"
-        ]
-    )
-
-
-    return match
-
-
-# ============================================================
-# BYTE RANGE DOWNLOAD
-# ============================================================
-
-def download_byte_range(
-    grib_url,
-    start,
-    end,
-    outpath
-):
-
-    if (
-        os.path.exists(
-            outpath
-        )
-        and
-        os.path.getsize(
-            outpath
-        )
-        >
-        0
-    ):
-
-        print(
-            "Using cached subset:",
-            outpath
-        )
-
-        return outpath
-
-
-    headers = {}
-
-
-    if end is None:
-
-        headers[
-            "Range"
-        ] = (
-            f"bytes={start}-"
-        )
-
-
-    else:
-
-        headers[
-            "Range"
-        ] = (
-            f"bytes="
-            f"{start}-"
-            f"{end}"
-        )
-
-
-    last_error = None
-
-
-    for attempt in range(
-        1,
-        DOWNLOAD_ATTEMPTS + 1
-    ):
-
-        try:
-
-            print(
-                "Downloading byte range:",
-                headers[
-                    "Range"
-                ]
-            )
-
-
-            r = requests.get(
-                grib_url,
-
-                headers=
-                    headers,
-
-                stream=
-                    True,
-
-                timeout=
-                    120
-            )
-
-
-            if (
-                r.status_code
-                not in
-                (
-                    200,
-                    206
-                )
-            ):
-
-                r.raise_for_status()
-
-
-            with open(
-                outpath,
-                "wb"
-            ) as f:
-
-                for chunk in r.iter_content(
-                    chunk_size=
-                        1024
-                        *
-                        1024
-                ):
-
-                    if chunk:
-
-                        f.write(
-                            chunk
-                        )
-
-
-            if (
-                os.path.getsize(
-                    outpath
-                )
-                ==
-                0
-            ):
-
-                raise RuntimeError(
-                    "Downloaded file is empty."
-                )
-
-
-            return outpath
-
-
-        except Exception as e:
-
-            last_error = e
-
-
-            if os.path.exists(
-                outpath
-            ):
-
-                try:
-
-                    os.remove(
-                        outpath
-                    )
-
-                except Exception:
-
-                    pass
-
-
-            if (
-                attempt
-                <
-                DOWNLOAD_ATTEMPTS
-            ):
-
-                print(
-                    f"Retrying in "
-                    f"{DOWNLOAD_RETRY_SECONDS}s..."
-                )
-
-
-                time.sleep(
-                    DOWNLOAD_RETRY_SECONDS
-                )
-
-
-    raise RuntimeError(
-        f"Byte-range download failed: "
-        f"{last_error}"
-    )
-
-
-# ============================================================
-# OPEN SUBSET
-# ============================================================
-
-def open_subset_grib(
-    path,
-    label
-):
-
-    ds = xr.open_dataset(
-        path,
-
-        engine=
-            "cfgrib",
-
-        backend_kwargs={
-            "indexpath":
-                ""
-        }
-    )
-
-
-    if (
-        len(
-            ds.data_vars
-        )
-        ==
-        0
-    ):
-
-        raise RuntimeError(
-            f"No variables found "
-            f"for {label}"
-        )
-
-
-    var = list(
-        ds.data_vars
-    )[
-        0
-    ]
-
-
-    da = ds[
-        var
-    ]
-
-
-    print(
-        f"Opened {label}: "
-        f"var={var}, "
-        f"dims={da.dims}, "
-        f"shape={da.shape}"
-    )
-
-
-    return da
-
-
-# ============================================================
-# RRFS FIELD
-# ============================================================
-
-def rrfs_idx_field(
-    init_dt,
-    fhr,
-    term_sets,
-    label,
-    product="2dfld"
-):
-
-    grib_url = rrfs_grib_url(
-        init_dt,
-        fhr,
-        product=
-            product
-    )
-
-
-    idx_url = (
-        grib_url
-        +
-        ".idx"
-    )
-
-
-    print("")
-    print(
-        "GRIB:",
-        grib_url
-    )
-
-
-    lines = read_idx(
-        idx_url
-    )
-
-
-    parsed = parse_idx_lines(
-        lines
-    )
-
-
-    last_error = None
-
-
-    for terms in term_sets:
-
-        try:
-
-            match = find_idx_match(
-                parsed,
-                terms,
-                label
-            )
-
-
-            safe_label = re.sub(
-                r"[^A-Za-z0-9]+",
-                "_",
-                label
-            ).strip(
-                "_"
-            )
-
-
-            outname = (
-                f"rrfs_"
-                f"{product}_"
-                f"{init_dt:%Y%m%d_%H}z_"
-                f"f{fhr:03d}_"
-                f"{safe_label}_"
-                f"{match['msg_num']}."
-                f"grib2"
-            )
-
-
-            outpath = os.path.join(
-                DATA_DIR,
-                outname
-            )
-
-
-            download_byte_range(
-                grib_url,
-
-                match[
-                    "start"
-                ],
-
-                match[
-                    "end"
-                ],
-
-                outpath
-            )
-
-
-            return open_subset_grib(
-                outpath,
-                label
-            )
-
-
-        except Exception as e:
-
-            last_error = e
-
-
-    raise RuntimeError(
-        f"Could not open "
-        f"{label}. "
-        f"Last error: "
-        f"{last_error}"
-    )
-
-
-# ============================================================
-# SPATIAL HELPERS
-# ============================================================
-
-def subset_2d(
-    lat,
-    lon,
-    *fields
-):
-
-    mask = (
-        np.isfinite(
-            lat
-        )
-        &
-        np.isfinite(
-            lon
-        )
-        &
-        (
-            lon >= LON_MIN
-        )
-        &
-        (
-            lon <= LON_MAX
-        )
-        &
-        (
-            lat >= LAT_MIN
-        )
-        &
-        (
-            lat <= LAT_MAX
-        )
-    )
-
-
-    if not np.any(
-        mask
-    ):
-
-        raise RuntimeError(
-            "No grid points found "
-            "inside selected domain."
-        )
-
-
-    iy, ix = np.where(
-        mask
-    )
-
-
-    iy0 = max(
-        iy.min() - 2,
-        0
-    )
-
-
-    iy1 = min(
-        iy.max() + 3,
-        lat.shape[
-            0
-        ]
-    )
-
-
-    ix0 = max(
-        ix.min() - 2,
-        0
-    )
-
-
-    ix1 = min(
-        ix.max() + 3,
-        lon.shape[
-            1
-        ]
-    )
-
-
-    return (
-
-        lat[
-            iy0:iy1,
-            ix0:ix1
-        ],
-
-        lon[
-            iy0:iy1,
-            ix0:ix1
-        ],
-
-        [
-            f[
-                iy0:iy1,
-                ix0:ix1
-            ]
-
-            for f
-            in fields
-        ]
-
-    )
-
-
-def interp_to_target_grid(
-    src_lat,
-    src_lon,
-    src_field,
-    tgt_lat,
-    tgt_lon
-):
-
-    src_points = np.column_stack(
-        (
-            src_lon.ravel(),
-            src_lat.ravel()
-        )
-    )
-
-
-    src_values = (
-        np.asarray(
-            src_field
-        )
-        .ravel()
-    )
-
-
-    good = (
-        np.isfinite(
-            src_points[
-                :,
-                0
-            ]
-        )
-        &
-        np.isfinite(
-            src_points[
-                :,
-                1
-            ]
-        )
-        &
-        np.isfinite(
-            src_values
-        )
-    )
-
-
-    out = griddata(
-        src_points[
-            good
-        ],
-
-        src_values[
-            good
-        ],
-
-        (
-            tgt_lon,
-            tgt_lat
-        ),
-
-        method=
-            "linear"
-    )
-
-
-    if np.isnan(
-        out
-    ).any():
-
-        out_nearest = griddata(
-            src_points[
-                good
-            ],
-
-            src_values[
-                good
-            ],
-
-            (
-                tgt_lon,
-                tgt_lat
-            ),
-
-            method=
-                "nearest"
-        )
-
-
-        out = np.where(
-            np.isnan(
-                out
-            ),
-            out_nearest,
-            out
-        )
-
-
-    return out
 
 
 # ============================================================
@@ -2506,8 +2792,14 @@ def upload_runs_json(
     )
 
 
+    print(
+        "Uploaded runs.json "
+        "with last 4 RRFS runs."
+    )
+
+
 # ============================================================
-# FIND INIT
+# FIND RRFS INIT
 # ============================================================
 
 init_dt = (
@@ -2568,12 +2860,14 @@ fhrs = range(
 print("")
 print("=" * 70)
 
+
 print(
     "Using RRFS init:",
     init_dt.strftime(
         "%Y-%m-%d %HZ"
     )
 )
+
 
 print(
     "Forecast hours:",
@@ -2582,12 +2876,20 @@ print(
     )
 )
 
+
+print(
+    "Output directory:",
+    OUTDIR
+)
+
+
 print(
     "Domains:",
     list(
         DOMAINS.keys()
     )
 )
+
 
 print("=" * 70)
 
@@ -2598,18 +2900,15 @@ lbf_geom = get_lbf_cwa_geom(
 
 
 # ============================================================
-# LOAD FIELDS ONCE PER HOUR
+# LOAD ALL RRFS FIELDS FOR ONE FORECAST HOUR
 # ============================================================
 
 def load_rrfs_fields_once(
     fhr
 ):
 
-    print(
-        "\n"
-        +
-        "=" * 70
-    )
+    print("")
+    print("=" * 70)
 
 
     print(
@@ -2620,731 +2919,568 @@ def load_rrfs_fields_once(
     )
 
 
-    print(
-        "=" * 70
-    )
+    print("=" * 70)
 
 
-    # --------------------------------------------------------
-    # REFLECTIVITY
-    # --------------------------------------------------------
+    two_d_path = None
 
-    refl_da = rrfs_idx_field(
-        init_dt,
-        fhr,
+    prs_path = None
 
-        [
-            [
-                "REFD",
-                "1000 m"
-            ],
 
-            [
-                "REFC"
-            ],
+    try:
 
-            [
-                "REFD"
-            ],
-        ],
+        # ====================================================
+        # DOWNLOAD FULL 2DFLD GRIB
+        # ====================================================
 
-        "reflectivity",
-
-        product=
+        two_d_path = download_full_grib(
+            init_dt,
+            fhr,
             "2dfld"
-    )
+        )
 
 
-    lat, lon = get_lat_lon(
-        refl_da
-    )
+        # ====================================================
+        # EXTRACT ALL 2-D FIELDS IN ONE PASS
+        # ====================================================
+
+        two_d = extract_fields_from_grib(
+
+            two_d_path,
+
+            TWO_D_FIELD_SEARCHES,
+
+            optional_fields={
+                "uh25",
+                "uh03",
+                "sim_ir",
+                "u_stm",
+                "v_stm"
+            }
+        )
 
 
-    refl = ensure_2d_field(
-        refl_da,
-        "reflectivity"
-    )
+        # ====================================================
+        # REQUIRED MAIN GRID
+        # ====================================================
 
-
-    refl = np.where(
-        refl
-        >=
-        REF_LEVELS[
-            0
-        ],
-
-        refl,
-
-        np.nan
-    )
-
-
-    # --------------------------------------------------------
-    # 2-5 KM UH
-    # --------------------------------------------------------
-
-    try:
-
-        uh25_da = rrfs_idx_field(
-            init_dt,
-            fhr,
-
-            [
-                [
-                    "MXUPHL",
-                    "5000-2000"
-                ],
-
-                [
-                    "MXUPHL",
-                    "5000 - 2000"
-                ],
-
-                [
-                    "MXUPHL"
-                ],
+        refl = np.asarray(
+            two_d[
+                "reflectivity"
+            ][
+                "field"
             ],
-
-            "2-5km UH",
-
-            product=
-                "2dfld"
+            dtype=float
         )
 
 
-        uh25 = ensure_2d_field(
-            uh25_da,
-            "2-5km UH"
+        lat = np.asarray(
+            two_d[
+                "reflectivity"
+            ][
+                "lat"
+            ],
+            dtype=float
         )
 
 
-    except Exception as e:
-
-        print(
-            f"2-5km UH unavailable "
-            f"F{fhr:03d}: {e}"
+        lon = np.asarray(
+            two_d[
+                "reflectivity"
+            ][
+                "lon"
+            ],
+            dtype=float
         )
 
 
-        uh25 = np.full_like(
+        refl = np.where(
+            refl
+            >=
+            REF_LEVELS[
+                0
+            ],
             refl,
             np.nan
         )
 
 
-    # --------------------------------------------------------
-    # 0-3 KM UH
-    # --------------------------------------------------------
+        # ====================================================
+        # OPTIONAL UH
+        # ====================================================
 
-    try:
+        if (
+            "uh25"
+            in
+            two_d
+        ):
 
-        uh03_da = rrfs_idx_field(
-            init_dt,
-            fhr,
-
-            [
-                [
-                    "MXUPHL",
-                    "3000-0"
+            uh25 = np.asarray(
+                two_d[
+                    "uh25"
+                ][
+                    "field"
                 ],
-
-                [
-                    "MXUPHL",
-                    "3000 - 0"
-                ],
-            ],
-
-            "0-3km UH",
-
-            product=
-                "2dfld"
-        )
-
-
-        uh03 = ensure_2d_field(
-            uh03_da,
-            "0-3km UH"
-        )
-
-
-    except Exception as e:
-
-        print(
-            f"0-3km UH unavailable "
-            f"F{fhr:03d}: {e}"
-        )
-
-
-        uh03 = np.full_like(
-            refl,
-            np.nan
-        )
-
-
-    # --------------------------------------------------------
-    # SIMULATED IR
-    # --------------------------------------------------------
-
-    try:
-
-        ir_da = rrfs_idx_field(
-            init_dt,
-            fhr,
-
-            [
-                [
-                    "SBT123"
-                ],
-
-                [
-                    "SBT124"
-                ],
-
-                [
-                    "SBT",
-                    "123"
-                ],
-
-                [
-                    "SBT",
-                    "124"
-                ],
-
-                [
-                    "brightness"
-                ],
-
-                [
-                    "satellite"
-                ],
-            ],
-
-            "simulated IR",
-
-            product=
-                "2dfld"
-        )
-
-
-        ir_c = k_to_c(
-            ensure_2d_field(
-                ir_da,
-                "simulated IR"
+                dtype=float
             )
+
+
+        else:
+
+            uh25 = np.full_like(
+                refl,
+                np.nan
+            )
+
+
+        if (
+            "uh03"
+            in
+            two_d
+        ):
+
+            uh03 = np.asarray(
+                two_d[
+                    "uh03"
+                ][
+                    "field"
+                ],
+                dtype=float
+            )
+
+
+        else:
+
+            uh03 = np.full_like(
+                refl,
+                np.nan
+            )
+
+
+        # ====================================================
+        # OPTIONAL SIM IR
+        # ====================================================
+
+        if (
+            "sim_ir"
+            in
+            two_d
+        ):
+
+            ir_c = k_to_c(
+                two_d[
+                    "sim_ir"
+                ][
+                    "field"
+                ]
+            )
+
+
+        else:
+
+            ir_c = np.full_like(
+                refl,
+                np.nan
+            )
+
+
+        # ====================================================
+        # 2-M TEMP / SURFACE PRESSURE
+        # ====================================================
+
+        t2_k = np.asarray(
+            two_d[
+                "t2"
+            ][
+                "field"
+            ],
+            dtype=float
         )
 
 
-    except Exception as e:
-
-        print(
-            f"Sim IR unavailable "
-            f"F{fhr:03d}: {e}"
+        ps_pa = np.asarray(
+            two_d[
+                "psfc"
+            ][
+                "field"
+            ],
+            dtype=float
         )
 
 
-        ir_c = np.full_like(
-            refl,
-            np.nan
+        # ====================================================
+        # THETA COLD POOL
+        # ====================================================
+
+        theta = (
+            t2_k
+            *
+            (
+                100000.0
+                /
+                ps_pa
+            )**0.286
         )
 
 
-    # --------------------------------------------------------
-    # 2M TEMP
-    # --------------------------------------------------------
+        theta_bg = gaussian_filter(
+            theta,
+            sigma=18
+        )
 
-    t2_da = rrfs_idx_field(
-        init_dt,
-        fhr,
 
-        [
-            [
-                "TMP",
-                "2 m above ground"
-            ],
+        theta_prime = (
+            theta
+            -
+            theta_bg
+        )
 
-            [
-                "TMP",
-                "2 m"
-            ],
-        ],
 
-        "2m temperature",
+        # ====================================================
+        # DOWNLOAD PRESSURE-LEVEL GRIB
+        # ====================================================
 
-        product=
-            "2dfld"
-    )
-
-
-    # --------------------------------------------------------
-    # SURFACE PRESSURE
-    # --------------------------------------------------------
-
-    ps_da = rrfs_idx_field(
-        init_dt,
-        fhr,
-
-        [
-            [
-                "PRES",
-                "surface"
-            ],
-        ],
-
-        "surface pressure",
-
-        product=
-            "2dfld"
-    )
-
-
-    t2_k = ensure_2d_field(
-        t2_da,
-        "2m temperature"
-    )
-
-
-    ps_pa = ensure_2d_field(
-        ps_da,
-        "surface pressure"
-    )
-
-
-    # --------------------------------------------------------
-    # THETA COLD POOLS
-    # --------------------------------------------------------
-
-    theta = (
-        t2_k
-        *
-        (
-            100000.0
-            /
-            ps_pa
-        )**0.286
-    )
-
-
-    theta_bg = gaussian_filter(
-        theta,
-        sigma=18
-    )
-
-
-    theta_prime = (
-        theta
-        -
-        theta_bg
-    )
-
-
-    # --------------------------------------------------------
-    # 700 / 600 / 500 MB WINDS
-    # --------------------------------------------------------
-
-    u700_da = rrfs_idx_field(
-        init_dt,
-        fhr,
-
-        [
-            [
-                "UGRD",
-                "700 mb"
-            ],
-
-            [
-                "UGRD",
-                "700"
-            ],
-        ],
-
-        "700mb U wind",
-
-        product=
-            "prslev"
-    )
-
-
-    v700_da = rrfs_idx_field(
-        init_dt,
-        fhr,
-
-        [
-            [
-                "VGRD",
-                "700 mb"
-            ],
-
-            [
-                "VGRD",
-                "700"
-            ],
-        ],
-
-        "700mb V wind",
-
-        product=
-            "prslev"
-    )
-
-
-    u600_da = rrfs_idx_field(
-        init_dt,
-        fhr,
-
-        [
-            [
-                "UGRD",
-                "600 mb"
-            ],
-
-            [
-                "UGRD",
-                "600"
-            ],
-        ],
-
-        "600mb U wind",
-
-        product=
-            "prslev"
-    )
-
-
-    v600_da = rrfs_idx_field(
-        init_dt,
-        fhr,
-
-        [
-            [
-                "VGRD",
-                "600 mb"
-            ],
-
-            [
-                "VGRD",
-                "600"
-            ],
-        ],
-
-        "600mb V wind",
-
-        product=
-            "prslev"
-    )
-
-
-    u500_da = rrfs_idx_field(
-        init_dt,
-        fhr,
-
-        [
-            [
-                "UGRD",
-                "500 mb"
-            ],
-
-            [
-                "UGRD",
-                "500"
-            ],
-        ],
-
-        "500mb U wind",
-
-        product=
-            "prslev"
-    )
-
-
-    v500_da = rrfs_idx_field(
-        init_dt,
-        fhr,
-
-        [
-            [
-                "VGRD",
-                "500 mb"
-            ],
-
-            [
-                "VGRD",
-                "500"
-            ],
-        ],
-
-        "500mb V wind",
-
-        product=
-            "prslev"
-    )
-
-
-    pr_lat, pr_lon = get_lat_lon(
-        u700_da
-    )
-
-
-    u46_pr = np.nanmean(
-        np.stack(
-            [
-                ensure_2d_field(
-                    u700_da,
-                    "700mb U wind"
-                ),
-
-                ensure_2d_field(
-                    u600_da,
-                    "600mb U wind"
-                ),
-
-                ensure_2d_field(
-                    u500_da,
-                    "500mb U wind"
-                ),
-            ]
-        ),
-        axis=0
-    )
-
-
-    v46_pr = np.nanmean(
-        np.stack(
-            [
-                ensure_2d_field(
-                    v700_da,
-                    "700mb V wind"
-                ),
-
-                ensure_2d_field(
-                    v600_da,
-                    "600mb V wind"
-                ),
-
-                ensure_2d_field(
-                    v500_da,
-                    "500mb V wind"
-                ),
-            ]
-        ),
-        axis=0
-    )
-
-
-    u46_native = interp_to_target_grid(
-        pr_lat,
-        pr_lon,
-        u46_pr,
-        lat,
-        lon
-    )
-
-
-    v46_native = interp_to_target_grid(
-        pr_lat,
-        pr_lon,
-        v46_pr,
-        lat,
-        lon
-    )
-
-
-    # --------------------------------------------------------
-    # STORM MOTION
-    # --------------------------------------------------------
-
-    try:
-
-        u_stm_da = rrfs_idx_field(
+        prs_path = download_full_grib(
             init_dt,
             fhr,
+            "prslev"
+        )
 
-            [
-                [
-                    "UEID"
-                ],
 
-                [
-                    "USTM"
-                ],
+        # ====================================================
+        # EXTRACT 700/600/500 WINDS IN ONE PASS
+        # ====================================================
 
-                [
-                    "BUNK"
-                ],
+        prs = extract_fields_from_grib(
+            prs_path,
+            PRESSURE_FIELD_SEARCHES
+        )
+
+
+        pr_lat = np.asarray(
+            prs[
+                "u700"
+            ][
+                "lat"
             ],
-
-            "Bunkers storm motion U",
-
-            product=
-                "2dfld"
+            dtype=float
         )
 
 
-        v_stm_da = rrfs_idx_field(
-            init_dt,
-            fhr,
-
-            [
-                [
-                    "VEID"
-                ],
-
-                [
-                    "VSTM"
-                ],
-
-                [
-                    "BUNK"
-                ],
+        pr_lon = np.asarray(
+            prs[
+                "u700"
+            ][
+                "lon"
             ],
-
-            "Bunkers storm motion V",
-
-            product=
-                "2dfld"
+            dtype=float
         )
 
 
-        stm_lat, stm_lon = get_lat_lon(
-            u_stm_da
-        )
+        u46_pr = np.nanmean(
 
+            np.stack(
+                [
 
-        u_stm_native = interp_to_target_grid(
-            stm_lat,
-            stm_lon,
+                    prs[
+                        "u700"
+                    ][
+                        "field"
+                    ],
 
-            ensure_2d_field(
-                u_stm_da,
-                "Bunkers storm motion U"
+                    prs[
+                        "u600"
+                    ][
+                        "field"
+                    ],
+
+                    prs[
+                        "u500"
+                    ][
+                        "field"
+                    ],
+
+                ]
             ),
 
+            axis=0
+
+        )
+
+
+        v46_pr = np.nanmean(
+
+            np.stack(
+                [
+
+                    prs[
+                        "v700"
+                    ][
+                        "field"
+                    ],
+
+                    prs[
+                        "v600"
+                    ][
+                        "field"
+                    ],
+
+                    prs[
+                        "v500"
+                    ][
+                        "field"
+                    ],
+
+                ]
+            ),
+
+            axis=0
+
+        )
+
+
+        # ====================================================
+        # INTERPOLATE PRESSURE WINDS TO 2DFLD GRID
+        # ====================================================
+
+        u46_native = interp_to_target_grid(
+            pr_lat,
+            pr_lon,
+            u46_pr,
             lat,
             lon
         )
 
 
-        v_stm_native = interp_to_target_grid(
-            stm_lat,
-            stm_lon,
-
-            ensure_2d_field(
-                v_stm_da,
-                "Bunkers storm motion V"
-            ),
-
+        v46_native = interp_to_target_grid(
+            pr_lat,
+            pr_lon,
+            v46_pr,
             lat,
             lon
         )
 
 
-        sr_u46 = (
-            u46_native
-            -
-            u_stm_native
-        )
+        # ====================================================
+        # STORM MOTION
+        # ====================================================
 
+        if (
+            "u_stm"
+            in
+            two_d
+            and
+            "v_stm"
+            in
+            two_d
+        ):
 
-        sr_v46 = (
-            v46_native
-            -
-            v_stm_native
-        )
-
-
-        storm_motion_source = (
-            "RRFS UEID/VEID"
-        )
-
-
-    except Exception as e:
-
-        print(
-            "Could not load RRFS "
-            "storm motion; using "
-            "manual storm motion."
-        )
-
-
-        print(
-            e
-        )
-
-
-        (
-            storm_u_scalar,
-            storm_v_scalar
-
-        ) = wind_from_dir_speed_to_uv(
-            MANUAL_STORM_MOTION_FROM_DEG,
-
-            kt_to_ms(
-                MANUAL_STORM_MOTION_SPEED_KT
+            print(
+                "Using RRFS storm motion."
             )
-        )
 
 
-        sr_u46 = (
-            u46_native
-            -
-            np.full_like(
-                refl,
-                storm_u_scalar
+            stm_lat = np.asarray(
+                two_d[
+                    "u_stm"
+                ][
+                    "lat"
+                ],
+                dtype=float
             )
-        )
 
 
-        sr_v46 = (
-            v46_native
-            -
-            np.full_like(
-                refl,
+            stm_lon = np.asarray(
+                two_d[
+                    "u_stm"
+                ][
+                    "lon"
+                ],
+                dtype=float
+            )
+
+
+            u_stm_native = interp_to_target_grid(
+                stm_lat,
+                stm_lon,
+
+                two_d[
+                    "u_stm"
+                ][
+                    "field"
+                ],
+
+                lat,
+                lon
+            )
+
+
+            v_stm_native = interp_to_target_grid(
+                stm_lat,
+                stm_lon,
+
+                two_d[
+                    "v_stm"
+                ][
+                    "field"
+                ],
+
+                lat,
+                lon
+            )
+
+
+            sr_u46 = (
+                u46_native
+                -
+                u_stm_native
+            )
+
+
+            sr_v46 = (
+                v46_native
+                -
+                v_stm_native
+            )
+
+
+            storm_motion_source = (
+                "RRFS storm motion"
+            )
+
+
+        else:
+
+            print(
+                "RRFS storm motion not found. "
+                "Using manual storm motion."
+            )
+
+
+            (
+                storm_u_scalar,
                 storm_v_scalar
+
+            ) = wind_from_dir_speed_to_uv(
+                MANUAL_STORM_MOTION_FROM_DEG,
+
+                kt_to_ms(
+                    MANUAL_STORM_MOTION_SPEED_KT
+                )
             )
-        )
 
 
-        storm_motion_source = (
-            "Manual storm motion"
-        )
+            sr_u46 = (
+                u46_native
+                -
+                np.full_like(
+                    refl,
+                    storm_u_scalar
+                )
+            )
 
 
-    return {
+            sr_v46 = (
+                v46_native
+                -
+                np.full_like(
+                    refl,
+                    storm_v_scalar
+                )
+            )
 
-        "lat":
-            lat,
 
-        "lon":
-            lon,
+            storm_motion_source = (
+                "Manual storm motion"
+            )
 
-        "refl":
-            refl,
 
-        "uh25":
-            uh25,
+        # ====================================================
+        # RETURN
+        # ====================================================
 
-        "uh03":
-            uh03,
+        return {
 
-        "ir_c":
-            ir_c,
+            "lat":
+                lat,
 
-        "theta_prime":
-            theta_prime,
+            "lon":
+                lon,
 
-        "sr_u46":
-            sr_u46,
+            "refl":
+                refl,
 
-        "sr_v46":
-            sr_v46,
+            "uh25":
+                uh25,
 
-        "storm_motion_source":
-            storm_motion_source,
+            "uh03":
+                uh03,
 
-    }
+            "ir_c":
+                ir_c,
+
+            "theta_prime":
+                theta_prime,
+
+            "sr_u46":
+                sr_u46,
+
+            "sr_v46":
+                sr_v46,
+
+            "storm_motion_source":
+                storm_motion_source,
+
+        }
+
+
+    finally:
+
+        # ====================================================
+        # DELETE HUGE GRIBS
+        # ====================================================
+
+        if DELETE_GRIB_AFTER_HOUR:
+
+            for path in (
+                two_d_path,
+                prs_path
+            ):
+
+                if (
+                    path
+                    and
+                    os.path.exists(
+                        path
+                    )
+                ):
+
+                    try:
+
+                        os.remove(
+                            path
+                        )
+
+
+                        print(
+                            "Deleted large GRIB:",
+                            path
+                        )
+
+
+                    except Exception as e:
+
+                        print(
+                            f"Could not delete "
+                            f"{path}: {e}"
+                        )
+
+
+        gc.collect()
 
 
 # ============================================================
-# PLOT
+# PLOT FUNCTION
 # ============================================================
 
 def plot_domain_from_fields(
@@ -3390,853 +3526,941 @@ def plot_domain_from_fields(
     )
 
 
-    lat = fields[
-        "lat"
-    ]
+    try:
 
-
-    lon = fields[
-        "lon"
-    ]
-
-
-    refl = fields[
-        "refl"
-    ]
-
-
-    uh25 = fields[
-        "uh25"
-    ]
-
-
-    uh03 = fields[
-        "uh03"
-    ]
-
-
-    ir_c = fields[
-        "ir_c"
-    ]
-
-
-    theta_prime = fields[
-        "theta_prime"
-    ]
-
-
-    sr_u46 = fields[
-        "sr_u46"
-    ]
-
-
-    sr_v46 = fields[
-        "sr_v46"
-    ]
-
-
-    (
-        lat_sub,
-        lon_sub,
-        [
-            refl_sub,
-            uh25_sub,
-            uh03_sub,
-            ir_sub,
-            theta_prime_sub,
-            sr_u46_sub,
-            sr_v46_sub,
+        lat = fields[
+            "lat"
         ]
 
-    ) = subset_2d(
-        lat,
-        lon,
-        refl,
-        uh25,
-        uh03,
-        ir_c,
-        theta_prime,
-        sr_u46,
-        sr_v46
-    )
+
+        lon = fields[
+            "lon"
+        ]
 
 
-    refl_plot = gaussian_filter(
-        np.nan_to_num(
-            refl_sub,
-            nan=0.0
-        ),
-        sigma=0.5
-    )
+        refl = fields[
+            "refl"
+        ]
 
 
-    refl_plot = np.where(
-        refl_plot >= 5,
-        refl_plot,
-        np.nan
-    )
+        uh25 = fields[
+            "uh25"
+        ]
 
 
-    uh25_plot = gaussian_filter(
-        np.nan_to_num(
-            uh25_sub,
-            nan=0.0
-        ),
-        sigma=0.2
-    )
+        uh03 = fields[
+            "uh03"
+        ]
 
 
-    uh03_plot = gaussian_filter(
-        np.nan_to_num(
-            uh03_sub,
-            nan=0.0
-        ),
-        sigma=0.2
-    )
+        ir_c = fields[
+            "ir_c"
+        ]
 
 
-    uh_combined = np.where(
+        theta_prime = fields[
+            "theta_prime"
+        ]
+
+
+        sr_u46 = fields[
+            "sr_u46"
+        ]
+
+
+        sr_v46 = fields[
+            "sr_v46"
+        ]
+
+
         (
-            uh25_plot >= 75
-        )
-        |
-        (
-            uh03_plot >= 50
-        ),
-        1,
-        np.nan
-    )
-
-
-    theta_prime_smooth = gaussian_filter(
-        theta_prime_sub,
-        sigma=2.5
-    )
-
-
-    theta_cp_mask = np.ma.masked_where(
-        theta_prime_smooth > -2.0,
-        theta_prime_smooth
-    )
-
-
-    ir_mask = None
-
-
-    if np.isfinite(
-        ir_sub
-    ).any():
-
-        ir_smooth = gaussian_filter(
-            ir_sub,
-            sigma=4.0
-        )
-
-
-        ir_mask = np.ma.masked_where(
-            ir_smooth > -40,
-            ir_smooth
-        )
-
-
-    plt.close(
-        "all"
-    )
-
-
-    plt.rcParams[
-        "hatch.color"
-    ] = "#b7d6ff"
-
-
-    plt.rcParams[
-        "hatch.linewidth"
-    ] = 0.7
-
-
-    plt.rcParams[
-        "contour.negative_linestyle"
-    ] = "solid"
-
-
-    fig = plt.figure(
-        figsize=(
-            14,
-            10
-        )
-    )
-
-
-    ax = plt.axes(
-        projection=
-            ccrs.PlateCarree()
-    )
-
-
-    ax.set_extent(
-        cfg[
-            "extent"
-        ],
-
-        crs=
-            ccrs.PlateCarree()
-    )
-
-
-    ax.add_feature(
-        cfeature.LAND,
-        facecolor=
-            "white",
-        zorder=
-            0
-    )
-
-
-    if ir_mask is not None:
-
-        ax.contourf(
-            lon_sub,
             lat_sub,
-            ir_mask,
-
-            levels=[
-                -130,
-                -40
-            ],
-
-            colors=[
-                "#d0d0d0"
-            ],
-
-            alpha=
-                0.35,
-
-            transform=
-                ccrs.PlateCarree(),
-
-            zorder=
-                2
-        )
-
-
-    ax.contourf(
-        lon_sub,
-        lat_sub,
-        theta_cp_mask,
-
-        levels=[
-            -30,
-            -2
-        ],
-
-        colors=
-            "none",
-
-        hatches=[
-            "///"
-        ],
-
-        transform=
-            ccrs.PlateCarree(),
-
-        zorder=
-            3
-    )
-
-
-    ax.contour(
-        lon_sub,
-        lat_sub,
-        theta_prime_smooth,
-
-        levels=[
-            -2
-        ],
-
-        colors=
-            "#b7d6ff",
-
-        linewidths=
-            1.2,
-
-        transform=
-            ccrs.PlateCarree(),
-
-        zorder=
-            4
-    )
-
-
-    pm = ax.contourf(
-        lon_sub,
-        lat_sub,
-        refl_plot,
-
-        levels=
-            bounds,
-
-        cmap=
-            cmap,
-
-        norm=
-            norm,
-
-        extend=
-            "neither",
-
-        transform=
-            ccrs.PlateCarree(),
-
-        zorder=
-            5
-    )
-
-
-    if np.isfinite(
-        uh_combined
-    ).any():
-
-        ax.contourf(
             lon_sub,
-            lat_sub,
-            uh_combined,
+            [
+                refl_sub,
+                uh25_sub,
+                uh03_sub,
+                ir_sub,
+                theta_prime_sub,
+                sr_u46_sub,
+                sr_v46_sub,
+            ]
 
-            levels=[
-                0.5,
-                1.5
-            ],
-
-            colors=[
-                "#8f8f8f"
-            ],
-
-            alpha=
-                0.55,
-
-            transform=
-                ccrs.PlateCarree(),
-
-            zorder=
-                8
+        ) = subset_2d(
+            lat,
+            lon,
+            refl,
+            uh25,
+            uh03,
+            ir_c,
+            theta_prime,
+            sr_u46,
+            sr_v46
         )
 
 
-    if (
-        np.nanmax(
-            uh25_plot
+        # ====================================================
+        # REFLECTIVITY
+        # ====================================================
+
+        refl_plot = gaussian_filter(
+            np.nan_to_num(
+                refl_sub,
+                nan=0.0
+            ),
+            sigma=0.5
         )
-        >=
-        75
-    ):
 
-        ax.contour(
-            lon_sub,
-            lat_sub,
-            uh25_plot,
 
-            levels=[
+        refl_plot = np.where(
+            refl_plot
+            >=
+            5,
+            refl_plot,
+            np.nan
+        )
+
+
+        # ====================================================
+        # UH
+        # ====================================================
+
+        uh25_plot = gaussian_filter(
+            np.nan_to_num(
+                uh25_sub,
+                nan=0.0
+            ),
+            sigma=0.2
+        )
+
+
+        uh03_plot = gaussian_filter(
+            np.nan_to_num(
+                uh03_sub,
+                nan=0.0
+            ),
+            sigma=0.2
+        )
+
+
+        uh_combined = np.where(
+            (
+                uh25_plot
+                >=
                 75
+            )
+            |
+            (
+                uh03_plot
+                >=
+                50
+            ),
+            1,
+            np.nan
+        )
+
+
+        # ====================================================
+        # COLD POOL
+        # ====================================================
+
+        theta_prime_smooth = gaussian_filter(
+            theta_prime_sub,
+            sigma=2.5
+        )
+
+
+        theta_cp_mask = np.ma.masked_where(
+            theta_prime_smooth
+            >
+            -2.0,
+            theta_prime_smooth
+        )
+
+
+        # ====================================================
+        # SIM IR
+        # ====================================================
+
+        ir_mask = None
+
+
+        if np.isfinite(
+            ir_sub
+        ).any():
+
+            ir_smooth = gaussian_filter(
+                ir_sub,
+                sigma=4.0
+            )
+
+
+            ir_mask = np.ma.masked_where(
+                ir_smooth
+                >
+                -40,
+                ir_smooth
+            )
+
+
+        # ====================================================
+        # FIGURE
+        # ====================================================
+
+        plt.close(
+            "all"
+        )
+
+
+        plt.rcParams[
+            "hatch.color"
+        ] = "#b7d6ff"
+
+
+        plt.rcParams[
+            "hatch.linewidth"
+        ] = 0.7
+
+
+        plt.rcParams[
+            "contour.negative_linestyle"
+        ] = "solid"
+
+
+        fig = plt.figure(
+            figsize=(
+                14,
+                10
+            )
+        )
+
+
+        ax = plt.axes(
+            projection=
+                ccrs.PlateCarree()
+        )
+
+
+        ax.set_extent(
+            cfg[
+                "extent"
+            ],
+            crs=
+                ccrs.PlateCarree()
+        )
+
+
+        ax.add_feature(
+            cfeature.LAND,
+            facecolor=
+                "white",
+            zorder=
+                0
+        )
+
+
+        # ====================================================
+        # IR
+        # ====================================================
+
+        if ir_mask is not None:
+
+            ax.contourf(
+                lon_sub,
+                lat_sub,
+                ir_mask,
+
+                levels=[
+                    -130,
+                    -40
+                ],
+
+                colors=[
+                    "#d0d0d0"
+                ],
+
+                alpha=
+                    0.35,
+
+                transform=
+                    ccrs.PlateCarree(),
+
+                zorder=
+                    2
+            )
+
+
+        # ====================================================
+        # COLD POOL
+        # ====================================================
+
+        ax.contourf(
+            lon_sub,
+            lat_sub,
+            theta_cp_mask,
+
+            levels=[
+                -30,
+                -2
             ],
 
             colors=
-                "#4a4a4a",
+                "none",
 
-            linewidths=
-                0.9,
+            hatches=[
+                "///"
+            ],
 
             transform=
                 ccrs.PlateCarree(),
 
             zorder=
-                9
+                3
         )
 
-
-    if (
-        np.nanmax(
-            uh03_plot
-        )
-        >=
-        50
-    ):
 
         ax.contour(
             lon_sub,
             lat_sub,
-            uh03_plot,
+            theta_prime_smooth,
 
             levels=[
-                50
+                -2
             ],
 
             colors=
-                "black",
+                "#b7d6ff",
 
             linewidths=
-                0.9,
+                1.2,
 
             transform=
                 ccrs.PlateCarree(),
 
             zorder=
-                10
+                4
         )
 
 
-    if PLOT_SR_WIND_BARBS:
+        # ====================================================
+        # REFLECTIVITY
+        # ====================================================
 
-        barb_skip = cfg[
-            "barb_skip"
-        ]
+        pm = ax.contourf(
+            lon_sub,
+            lat_sub,
+            refl_plot,
 
+            levels=
+                bounds,
 
-        ax.barbs(
-            lon_sub[
-                ::barb_skip,
-                ::barb_skip
-            ],
+            cmap=
+                cmap,
 
-            lat_sub[
-                ::barb_skip,
-                ::barb_skip
-            ],
+            norm=
+                norm,
 
-            ms_to_kt(
-                sr_u46_sub[
-                    ::barb_skip,
-                    ::barb_skip
-                ]
-            ),
-
-            ms_to_kt(
-                sr_v46_sub[
-                    ::barb_skip,
-                    ::barb_skip
-                ]
-            ),
-
-            length=
-                5,
-
-            linewidth=
-                0.7,
-
-            color=
-                "black",
+            extend=
+                "neither",
 
             transform=
                 ccrs.PlateCarree(),
 
             zorder=
-                23
+                5
         )
 
 
-    add_shapefile_outline(
-        ax,
-        STATE_SHP,
-        edgecolor=
-            "black",
-        linewidth=
-            1.4,
-        zorder=
-            13
-    )
+        # ====================================================
+        # UH FILL
+        # ====================================================
+
+        if np.isfinite(
+            uh_combined
+        ).any():
+
+            ax.contourf(
+                lon_sub,
+                lat_sub,
+                uh_combined,
+
+                levels=[
+                    0.5,
+                    1.5
+                ],
+
+                colors=[
+                    "#8f8f8f"
+                ],
+
+                alpha=
+                    0.55,
+
+                transform=
+                    ccrs.PlateCarree(),
+
+                zorder=
+                    8
+            )
 
 
-    add_shapefile_outline(
-        ax,
-        COUNTY_SHP,
-        edgecolor=
-            "lightgray",
-        linewidth=
-            0.35,
-        zorder=
-            12
-    )
+        # ====================================================
+        # 2-5 KM UH
+        # ====================================================
+
+        if (
+            np.nanmax(
+                uh25_plot
+            )
+            >=
+            75
+        ):
+
+            ax.contour(
+                lon_sub,
+                lat_sub,
+                uh25_plot,
+
+                levels=[
+                    75
+                ],
+
+                colors=
+                    "#4a4a4a",
+
+                linewidths=
+                    0.9,
+
+                transform=
+                    ccrs.PlateCarree(),
+
+                zorder=
+                    9
+            )
 
 
-    if lbf_geom is not None:
+        # ====================================================
+        # 0-3 KM UH
+        # ====================================================
 
-        add_counties_clipped_to_cwa(
+        if (
+            np.nanmax(
+                uh03_plot
+            )
+            >=
+            50
+        ):
+
+            ax.contour(
+                lon_sub,
+                lat_sub,
+                uh03_plot,
+
+                levels=[
+                    50
+                ],
+
+                colors=
+                    "black",
+
+                linewidths=
+                    0.9,
+
+                transform=
+                    ccrs.PlateCarree(),
+
+                zorder=
+                    10
+            )
+
+
+        # ====================================================
+        # SR WIND BARBS
+        # ====================================================
+
+        if PLOT_SR_WIND_BARBS:
+
+            barb_skip = cfg[
+                "barb_skip"
+            ]
+
+
+            ax.barbs(
+                lon_sub[
+                    ::barb_skip,
+                    ::barb_skip
+                ],
+
+                lat_sub[
+                    ::barb_skip,
+                    ::barb_skip
+                ],
+
+                ms_to_kt(
+                    sr_u46_sub[
+                        ::barb_skip,
+                        ::barb_skip
+                    ]
+                ),
+
+                ms_to_kt(
+                    sr_v46_sub[
+                        ::barb_skip,
+                        ::barb_skip
+                    ]
+                ),
+
+                length=
+                    5,
+
+                linewidth=
+                    0.7,
+
+                color=
+                    "black",
+
+                transform=
+                    ccrs.PlateCarree(),
+
+                zorder=
+                    23
+            )
+
+
+        # ====================================================
+        # STATES / COUNTIES
+        # ====================================================
+
+        add_shapefile_outline(
+            ax,
+            STATE_SHP,
+            edgecolor="black",
+            linewidth=1.4,
+            zorder=13
+        )
+
+
+        add_shapefile_outline(
             ax,
             COUNTY_SHP,
-            lbf_geom,
-            lw=
-                1.0,
-            color=
-                "black",
-            zorder=
-                13
+            edgecolor="lightgray",
+            linewidth=0.35,
+            zorder=12
         )
 
 
-        ax.add_geometries(
-            [
-                lbf_geom
-            ],
+        # ====================================================
+        # LBF CWA
+        # ====================================================
 
-            crs=
-                ccrs.PlateCarree(),
+        if lbf_geom is not None:
 
-            facecolor=
-                "none",
+            add_counties_clipped_to_cwa(
+                ax,
+                COUNTY_SHP,
+                lbf_geom,
+                lw=1.0,
+                color="black",
+                zorder=13
+            )
 
-            edgecolor=
-                "black",
 
-            linewidth=
-                3.5,
+            ax.add_geometries(
+                [
+                    lbf_geom
+                ],
 
-            zorder=
-                14
+                crs=
+                    ccrs.PlateCarree(),
+
+                facecolor=
+                    "none",
+
+                edgecolor=
+                    "black",
+
+                linewidth=
+                    3.5,
+
+                zorder=
+                    14
+            )
+
+
+            ax.add_geometries(
+                [
+                    lbf_geom
+                ],
+
+                crs=
+                    ccrs.PlateCarree(),
+
+                facecolor=
+                    "none",
+
+                edgecolor=
+                    "white",
+
+                linewidth=
+                    1.8,
+
+                zorder=
+                    15
+            )
+
+
+        # ====================================================
+        # TITLES
+        # ====================================================
+
+        valid_dt = (
+            init_dt
+            +
+            timedelta(
+                hours=fhr
+            )
         )
 
 
-        ax.add_geometries(
-            [
-                lbf_geom
-            ],
-
-            crs=
-                ccrs.PlateCarree(),
-
-            facecolor=
-                "none",
-
-            edgecolor=
-                "white",
-
-            linewidth=
-                1.8,
-
-            zorder=
-                15
+        valid_title = (
+            f"F{fhr:03d} Valid: "
+            f"{valid_dt:%a %Y-%m-%d %HZ}"
         )
 
 
-    valid_dt = (
-        init_dt
-        +
-        timedelta(
-            hours=fhr
-        )
-    )
-
-
-    valid_title = (
-        f"F{fhr:03d} Valid: "
-        f"{valid_dt:%a %Y-%m-%d %HZ}"
-    )
-
-
-    init_title = (
-        f"Init: "
-        f"{init_dt:%a %Y-%m-%d %HZ} "
-        "RRFS"
-    )
-
-
-    main_title = (
-        "RRFS | Refl, "
-        "2-5km UH > 75, "
-        "0-3km UH > 50, "
-        "θ Cold Pools, "
-        "4-6 km SR Winds"
-    )
-
-
-    ax.text(
-        0.0,
-        1.042,
-
-        main_title,
-
-        transform=
-            ax.transAxes,
-
-        ha=
-            "left",
-
-        va=
-            "bottom",
-
-        fontsize=
-            cfg[
-                "title_size"
-            ],
-
-        fontweight=
-            "bold"
-    )
-
-
-    ax.text(
-        0.0,
-        1.005,
-
-        valid_title,
-
-        transform=
-            ax.transAxes,
-
-        ha=
-            "left",
-
-        va=
-            "bottom",
-
-        fontsize=
-            cfg[
-                "subtitle_size"
-            ],
-
-        fontweight=
-            "bold"
-    )
-
-
-    ax.text(
-        1.0,
-        1.005,
-
-        init_title,
-
-        transform=
-            ax.transAxes,
-
-        ha=
-            "right",
-
-        va=
-            "bottom",
-
-        fontsize=
-            cfg[
-                "subtitle_size"
-            ],
-
-        fontweight=
-            "bold"
-    )
-
-
-    divider = make_axes_locatable(
-        ax
-    )
-
-
-    cax = divider.append_axes(
-        "bottom",
-
-        size=
-            "3%",
-
-        pad=
-            0.25,
-
-        axes_class=
-            plt.Axes
-    )
-
-
-    cbar = plt.colorbar(
-        pm,
-
-        cax=
-            cax,
-
-        orientation=
-            "horizontal",
-
-        ticks=
-            REF_LEVELS,
-
-        drawedges=
-            True
-    )
-
-
-    cbar.set_label(
-        "Reflectivity (dBZ)",
-        fontsize=10,
-        weight="bold"
-    )
-
-
-    cbar.ax.xaxis.set_label_position(
-        "top"
-    )
-
-
-    cbar.ax.tick_params(
-        axis=
-            "x",
-        which=
-            "both",
-        length=
-            0
-    )
-
-
-    if os.path.exists(
-        LOGO_PATH
-    ):
-
-        logo = mpimg.imread(
-            LOGO_PATH
+        init_title = (
+            f"Init: "
+            f"{init_dt:%a %Y-%m-%d %HZ} "
+            "RRFS"
         )
 
 
-        logo_ax = ax.inset_axes(
-            [
-                0.82,
-                0.84,
-                0.165,
-                0.155
-            ],
+        main_title = (
+            "RRFS | Refl, "
+            "2-5km UH > 75, "
+            "0-3km UH > 50, "
+            "θ Cold Pools, "
+            "4-6 km SR Winds"
+        )
+
+
+        ax.text(
+            0.0,
+            1.042,
+
+            main_title,
 
             transform=
                 ax.transAxes,
 
-            zorder=
-                50
+            ha=
+                "left",
+
+            va=
+                "bottom",
+
+            fontsize=
+                cfg[
+                    "title_size"
+                ],
+
+            fontweight=
+                "bold"
         )
 
 
-        logo_ax.imshow(
-            logo
+        ax.text(
+            0.0,
+            1.005,
+
+            valid_title,
+
+            transform=
+                ax.transAxes,
+
+            ha=
+                "left",
+
+            va=
+                "bottom",
+
+            fontsize=
+                cfg[
+                    "subtitle_size"
+                ],
+
+            fontweight=
+                "bold"
         )
 
 
-        logo_ax.axis(
-            "off"
+        ax.text(
+            1.0,
+            1.005,
+
+            init_title,
+
+            transform=
+                ax.transAxes,
+
+            ha=
+                "right",
+
+            va=
+                "bottom",
+
+            fontsize=
+                cfg[
+                    "subtitle_size"
+                ],
+
+            fontweight=
+                "bold"
         )
 
 
-    ax.text(
-        0.902,
-        0.835,
+        # ====================================================
+        # COLORBAR
+        # ====================================================
 
-        "NWS North Platte, NE",
-
-        transform=
-            ax.transAxes,
-
-        ha=
-            "center",
-
-        va=
-            "top",
-
-        fontsize=
-            10,
-
-        fontweight=
-            "bold",
-
-        color=
-            "black",
-
-        zorder=
-            51,
-
-        path_effects=[
-            pe.withStroke(
-                linewidth=
-                    2.5,
-
-                foreground=
-                    "white"
-            )
-        ]
-    )
+        divider = make_axes_locatable(
+            ax
+        )
 
 
-    ax.text(
-        0.01,
-        0.015,
-
-        "Plot created by: Matthew Labenz",
-
-        transform=
-            ax.transAxes,
-
-        ha=
-            "left",
-
-        va=
+        cax = divider.append_axes(
             "bottom",
 
-        fontsize=
-            8,
+            size=
+                "3%",
 
-        weight=
-            "bold",
+            pad=
+                0.25,
 
-        color=
-            "black",
+            axes_class=
+                plt.Axes
+        )
 
-        zorder=
-            40,
 
-        path_effects=[
-            pe.withStroke(
-                linewidth=
-                    2.5,
+        cbar = plt.colorbar(
+            pm,
 
-                foreground=
-                    "white"
+            cax=
+                cax,
+
+            orientation=
+                "horizontal",
+
+            ticks=
+                REF_LEVELS,
+
+            drawedges=
+                True
+        )
+
+
+        cbar.set_label(
+            "Reflectivity (dBZ)",
+            fontsize=10,
+            weight="bold"
+        )
+
+
+        cbar.ax.xaxis.set_label_position(
+            "top"
+        )
+
+
+        cbar.ax.tick_params(
+            axis=
+                "x",
+            which=
+                "both",
+            length=
+                0
+        )
+
+
+        # ====================================================
+        # LOGO
+        # ====================================================
+
+        if os.path.exists(
+            LOGO_PATH
+        ):
+
+            logo = mpimg.imread(
+                LOGO_PATH
             )
-        ]
-    )
 
 
-    outname = os.path.join(
-        domain_outdir,
+            logo_ax = ax.inset_axes(
+                [
+                    0.82,
+                    0.84,
+                    0.165,
+                    0.155
+                ],
 
-        f"rrfs_lbf_"
-        f"f{fhr:03d}.png"
-    )
+                transform=
+                    ax.transAxes,
 
-
-    plt.savefig(
-        outname,
-        dpi=
-            140,
-        bbox_inches=
-            "tight"
-    )
-
-
-    plt.close(
-        fig
-    )
+                zorder=
+                    50
+            )
 
 
-    print(
-        "Saved:",
-        outname
-    )
+            logo_ax.imshow(
+                logo
+            )
 
 
-    filename = os.path.basename(
-        outname
-    )
+            logo_ax.axis(
+                "off"
+            )
 
 
-    remote_key = (
-        f"{R2_PRODUCT_PATH}/"
-        f"{cycle_str}/"
-        f"{domain_key}/"
-        f"{filename}"
-    )
+        # ====================================================
+        # OFFICE LABEL
+        # ====================================================
+
+        ax.text(
+            0.902,
+            0.835,
+
+            "NWS North Platte, NE",
+
+            transform=
+                ax.transAxes,
+
+            ha=
+                "center",
+
+            va=
+                "top",
+
+            fontsize=
+                10,
+
+            fontweight=
+                "bold",
+
+            color=
+                "black",
+
+            zorder=
+                51,
+
+            path_effects=[
+                pe.withStroke(
+                    linewidth=
+                        2.5,
+
+                    foreground=
+                        "white"
+                )
+            ]
+        )
 
 
-    upload_to_r2(
-        outname,
-        remote_key
-    )
+        # ====================================================
+        # CREATOR CREDIT
+        # ====================================================
+
+        ax.text(
+            0.01,
+            0.015,
+
+            "Plot created by: Matthew Labenz",
+
+            transform=
+                ax.transAxes,
+
+            ha=
+                "left",
+
+            va=
+                "bottom",
+
+            fontsize=
+                8,
+
+            weight=
+                "bold",
+
+            color=
+                "black",
+
+            zorder=
+                40,
+
+            path_effects=[
+                pe.withStroke(
+                    linewidth=
+                        2.5,
+
+                    foreground=
+                        "white"
+                )
+            ]
+        )
+
+
+        # ====================================================
+        # SAVE
+        # ====================================================
+
+        outname = os.path.join(
+            domain_outdir,
+            f"rrfs_lbf_f{fhr:03d}.png"
+        )
+
+
+        plt.savefig(
+            outname,
+            dpi=140,
+            bbox_inches="tight"
+        )
+
+
+        plt.close(
+            fig
+        )
+
+
+        print(
+            "Saved:",
+            outname
+        )
+
+
+        filename = os.path.basename(
+            outname
+        )
+
+
+        remote_key = (
+            f"{R2_PRODUCT_PATH}/"
+            f"{cycle_str}/"
+            f"{domain_key}/"
+            f"{filename}"
+        )
+
+
+        upload_to_r2(
+            outname,
+            remote_key
+        )
+
+
+    except Exception as e:
+
+        print(
+            f"Failed "
+            f"{domain_key.upper()} "
+            f"F{fhr:03d}: "
+            f"{e}"
+        )
 
 
 # ============================================================
@@ -4250,43 +4474,47 @@ failed_fhrs = []
 
 for fhr in fhrs:
 
+    print("")
+    print("#" * 70)
+
+
+    print(
+        f"STARTING RRFS F{fhr:03d}"
+    )
+
+
+    print("#" * 70)
+
+
     try:
 
-        fields = (
-            load_rrfs_fields_once(
-                fhr
-            )
+        fields = load_rrfs_fields_once(
+            fhr
         )
 
 
         for (
             domain_key,
             cfg
+
         ) in DOMAINS.items():
 
-            try:
-
-                plot_domain_from_fields(
-                    fields,
-                    domain_key,
-                    cfg,
-                    fhr
-                )
-
-
-            except Exception as e:
-
-                print(
-                    f"Failed "
-                    f"{domain_key.upper()} "
-                    f"F{fhr:03d}: "
-                    f"{e}"
-                )
+            plot_domain_from_fields(
+                fields,
+                domain_key,
+                cfg,
+                fhr
+            )
 
 
         successful_fhrs.append(
             fhr
         )
+
+
+        del fields
+
+        gc.collect()
 
 
     except Exception as e:
@@ -4308,8 +4536,11 @@ for fhr in fhrs:
         )
 
 
+        gc.collect()
+
+
 # ============================================================
-# SUMMARY
+# FINAL SUMMARY
 # ============================================================
 
 print("")
@@ -4321,7 +4552,7 @@ print("=" * 70)
 if successful_fhrs:
 
     print(
-        "Successful:"
+        "Successful forecast hours:"
     )
 
 
@@ -4337,7 +4568,7 @@ if successful_fhrs:
 else:
 
     print(
-        "Successful: none"
+        "Successful forecast hours: none"
     )
 
 
@@ -4347,13 +4578,14 @@ print("")
 if failed_fhrs:
 
     print(
-        "Failed:"
+        "Failed forecast hours:"
     )
 
 
     for (
         fhr,
         error
+
     ) in failed_fhrs:
 
         print(
@@ -4365,13 +4597,14 @@ if failed_fhrs:
 else:
 
     print(
-        "Failed: none"
+        "Failed forecast hours: none"
     )
 
 
 print("")
 print(
-    "Uploaded RRFS reflectivity/UH to:"
+    "Done. Uploaded RRFS "
+    "reflectivity/UH to R2:"
 )
 
 
