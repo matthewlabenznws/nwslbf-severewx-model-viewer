@@ -13,3 +13,4 @@ xarray
 boto3
 botocore
 metpy
+tqdm
