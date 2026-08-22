@@ -8,9 +8,9 @@
 # https://nomads.ncep.noaa.gov/pub/data/nccf/com/rrfs/para/
 #
 # IMPORTANT:
-# NOMADS parallel RRFS files are downloaded as full GRIB2 files.
-# The needed messages are extracted directly with ecCodes.
-# Large GRIB2 files are deleted after each forecast hour.
+# Uses NOMADS .idx inventories + HTTP byte-range requests.
+# Only the individual GRIB messages needed for the plot are downloaded.
+#
 #
 # Uploads:
 # runs/cams/rrfs/refl_uh/
@@ -31,6 +31,7 @@ import requests
 import boto3
 
 import numpy as np
+import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import matplotlib.patheffects as pe
@@ -59,14 +60,6 @@ from matplotlib.colors import (
     ListedColormap,
     BoundaryNorm
 )
-
-from eccodes import (
-    codes_grib_new_from_file,
-    codes_get,
-    codes_get_array,
-    codes_release
-)
-
 
 # ============================================================
 # PATHS / ASSETS
@@ -129,7 +122,7 @@ if os.path.exists(
 
 DATA_DIR = os.path.join(
     BASE_DIR,
-    "rrfs_full_grib"
+    "rrfs_subsets"
 )
 
 
@@ -648,9 +641,16 @@ add_spc_severe_domain()
 # SETTINGS
 # ============================================================
 
-VALID_RRFS_CYCLES = list(
-    range(24)
-)
+VALID_RRFS_CYCLES = [
+    0,
+    3,
+    6,
+    9,
+    12,
+    15,
+    18,
+    21
+]
 
 
 START_FHR = 1
@@ -687,10 +687,6 @@ PLOT_SR_WIND_BARBS = True
 DOWNLOAD_ATTEMPTS = 3
 
 DOWNLOAD_RETRY_SECONDS = 15
-
-
-# Remove large NOMADS GRIB files after each forecast hour.
-DELETE_GRIB_AFTER_HOUR = True
 
 
 # ============================================================
@@ -903,7 +899,7 @@ def wind_from_dir_speed_to_uv(
 
 
 # ============================================================
-# RRFS URL BUILDER
+# RRFS NOMADS URL + IDX BYTE-RANGE RETRIEVAL
 # ============================================================
 
 def rrfs_grib_url(
@@ -912,15 +908,8 @@ def rrfs_grib_url(
     product="2dfld"
 ):
 
-    ymd = init_dt.strftime(
-        "%Y%m%d"
-    )
-
-
-    hh = init_dt.strftime(
-        "%H"
-    )
-
+    ymd = init_dt.strftime("%Y%m%d")
+    hh = init_dt.strftime("%H")
 
     if product == "2dfld":
 
@@ -931,7 +920,6 @@ def rrfs_grib_url(
             f"conus.grib2"
         )
 
-
     elif product == "prslev":
 
         fname = (
@@ -941,14 +929,12 @@ def rrfs_grib_url(
             f"conus.grib2"
         )
 
-
     else:
 
         raise ValueError(
             "product must be "
             "'2dfld' or 'prslev'"
         )
-
 
     return (
         f"{RRFS_NOMADS_BASE}/"
@@ -958,40 +944,522 @@ def rrfs_grib_url(
     )
 
 
+def rrfs_idx_url(
+    init_dt,
+    fhr,
+    product="2dfld"
+):
+
+    return (
+        rrfs_grib_url(
+            init_dt,
+            fhr,
+            product=product
+        )
+        +
+        ".idx"
+    )
+
+
 # ============================================================
-# URL EXISTS
-#
-# Opens the request as a stream and immediately closes it.
-# It does NOT download the complete GRIB.
+# READ IDX WITH RETRIES
 # ============================================================
 
-def url_exists(
-    url,
-    timeout=15
+def read_idx(
+    idx_url,
+    timeout=30
 ):
+
+    last_error = None
+
+    for attempt in range(
+        1,
+        DOWNLOAD_ATTEMPTS + 1
+    ):
+
+        try:
+
+            r = requests.get(
+                idx_url,
+                timeout=timeout
+            )
+
+            r.raise_for_status()
+
+            text = r.text.strip()
+
+            if len(text) < 20:
+
+                raise RuntimeError(
+                    "IDX response was empty."
+                )
+
+            return text.splitlines()
+
+        except Exception as e:
+
+            last_error = e
+
+            print(
+                f"IDX attempt {attempt}/"
+                f"{DOWNLOAD_ATTEMPTS} failed: {e}"
+            )
+
+            if attempt < DOWNLOAD_ATTEMPTS:
+
+                time.sleep(
+                    DOWNLOAD_RETRY_SECONDS
+                )
+
+    raise RuntimeError(
+        f"Could not retrieve IDX: {idx_url}. "
+        f"Last error: {last_error}"
+    )
+
+
+# ============================================================
+# PARSE IDX
+# ============================================================
+
+def parse_idx_lines(
+    lines
+):
+
+    parsed = []
+
+    for line in lines:
+
+        parts = line.split(":")
+
+        if len(parts) < 3:
+            continue
+
+        try:
+
+            msg_num = int(parts[0])
+            start_byte = int(parts[1])
+
+        except Exception:
+            continue
+
+        parsed.append({
+            "line": line,
+            "msg_num": msg_num,
+            "start": start_byte,
+        })
+
+    for i in range(len(parsed)):
+
+        if i < len(parsed) - 1:
+
+            parsed[i]["end"] = (
+                parsed[i + 1]["start"]
+                -
+                1
+            )
+
+        else:
+            parsed[i]["end"] = None
+
+    return parsed
+
+
+# ============================================================
+# FIND FIELD IN IDX
+# ============================================================
+
+def find_idx_match(
+    parsed,
+    all_terms,
+    label
+):
+
+    terms = [
+        str(term).lower()
+        for term in all_terms
+    ]
+
+    for item in parsed:
+
+        line_lower = item["line"].lower()
+
+        if all(
+            term in line_lower
+            for term in terms
+        ):
+
+            print(
+                f"Matched {label}:"
+            )
+
+            print(
+                item["line"]
+            )
+
+            return item
+
+    return None
+
+
+# ============================================================
+# DOWNLOAD ONE GRIB MESSAGE BY BYTE RANGE
+# ============================================================
+
+def download_byte_range(
+    grib_url,
+    start_byte,
+    end_byte,
+    outpath
+):
+
+    if end_byte is None:
+        range_value = f"bytes={start_byte}-"
+    else:
+        range_value = f"bytes={start_byte}-{end_byte}"
+
+    headers = {
+        "Range": range_value
+    }
+
+    last_error = None
+
+    for attempt in range(
+        1,
+        DOWNLOAD_ATTEMPTS + 1
+    ):
+
+        try:
+
+            print(
+                "Downloading byte range:",
+                range_value
+            )
+
+            r = requests.get(
+                grib_url,
+                headers=headers,
+                stream=True,
+                timeout=120
+            )
+
+            if r.status_code not in (200, 206):
+                r.raise_for_status()
+
+            with open(
+                outpath,
+                "wb"
+            ) as f:
+
+                for chunk in r.iter_content(
+                    chunk_size=1024 * 1024
+                ):
+
+                    if chunk:
+                        f.write(chunk)
+
+            if (
+                not os.path.exists(outpath)
+                or
+                os.path.getsize(outpath) < 100
+            ):
+
+                raise RuntimeError(
+                    "Downloaded GRIB message was empty or incomplete."
+                )
+
+            return outpath
+
+        except Exception as e:
+
+            last_error = e
+
+            if os.path.exists(outpath):
+
+                try:
+                    os.remove(outpath)
+                except Exception:
+                    pass
+
+            if attempt < DOWNLOAD_ATTEMPTS:
+
+                print(
+                    f"Retrying in {DOWNLOAD_RETRY_SECONDS} seconds..."
+                )
+
+                time.sleep(
+                    DOWNLOAD_RETRY_SECONDS
+                )
+
+    raise RuntimeError(
+        f"Byte-range download failed: {last_error}"
+    )
+
+
+# ============================================================
+# OPEN ONE DOWNLOADED GRIB MESSAGE
+# ============================================================
+
+def open_subset_grib(
+    path,
+    label
+):
+
+    attempts = [
+        {},
+        {"typeOfLevel": "heightAboveGround"},
+        {"typeOfLevel": "surface"},
+        {"typeOfLevel": "isobaricInhPa"},
+        {"typeOfLevel": "isobaricInPa"},
+        {"typeOfLevel": "atmosphere"},
+        {"typeOfLevel": "entireAtmosphere"},
+        {"typeOfLevel": "heightAboveGroundLayer"},
+    ]
+
+    errors = []
+
+    for filter_keys in attempts:
+
+        try:
+
+            ds = xr.open_dataset(
+                path,
+                engine="cfgrib",
+                backend_kwargs={
+                    "indexpath": "",
+                    "filter_by_keys": filter_keys,
+                    "errors": "ignore",
+                }
+            )
+
+            if len(ds.data_vars) == 0:
+                ds.close()
+                continue
+
+            candidates = [
+                name
+                for name in ds.data_vars
+                if name not in {
+                    "latitude",
+                    "longitude",
+                    "valid_time",
+                    "step",
+                    "time",
+                }
+            ]
+
+            if not candidates:
+                ds.close()
+                continue
+
+            var = candidates[0]
+            da = ds[var].load()
+            ds.close()
+
+            print(
+                f"Opened {label}: "
+                f"var={var}, dims={da.dims}, shape={da.shape}"
+            )
+
+            return da
+
+        except Exception as e:
+            errors.append(str(e))
+
+    raise RuntimeError(
+        f"Could not open subset for {label}. "
+        f"Last errors: {errors[-3:]}"
+    )
+
+
+# ============================================================
+# LOAD A FIELD FROM NOMADS IDX + BYTE RANGE
+# ============================================================
+
+def rrfs_idx_field(
+    init_dt,
+    fhr,
+    term_sets,
+    label,
+    product="2dfld",
+    required=True
+):
+
+    grib_url = rrfs_grib_url(
+        init_dt,
+        fhr,
+        product=product
+    )
+
+    idx_url = grib_url + ".idx"
+
+    print("")
+    print(
+        f"RRFS {product} F{fhr:03d}: {grib_url}"
+    )
+
+    lines = read_idx(
+        idx_url
+    )
+
+    parsed = parse_idx_lines(
+        lines
+    )
+
+    match = None
+    matched_terms = None
+
+    for terms in term_sets:
+
+        candidate = find_idx_match(
+            parsed,
+            terms,
+            label
+        )
+
+        if candidate is not None:
+            match = candidate
+            matched_terms = terms
+            break
+
+    if match is None:
+
+        if required:
+
+            raise RuntimeError(
+                f"Could not find required field {label} "
+                f"in {idx_url}. Search terms: {term_sets}"
+            )
+
+        print(
+            f"Optional field {label} not found."
+        )
+
+        return None
+
+    safe_label = re.sub(
+        r"[^A-Za-z0-9]+",
+        "_",
+        label
+    ).strip("_")
+
+    outname = (
+        f"rrfs_{product}_"
+        f"{init_dt:%Y%m%d_%H}z_"
+        f"f{fhr:03d}_"
+        f"{safe_label}_"
+        f"{match['msg_num']}.grib2"
+    )
+
+    outpath = os.path.join(
+        DATA_DIR,
+        outname
+    )
 
     try:
 
-        with requests.get(
-            url,
-            stream=True,
-            timeout=timeout
-        ) as r:
+        download_byte_range(
+            grib_url,
+            match["start"],
+            match["end"],
+            outpath
+        )
 
-            return (
-                r.status_code
-                ==
-                200
-            )
+        da = open_subset_grib(
+            outpath,
+            label
+        )
 
+        return da
 
-    except Exception:
+    finally:
 
-        return False
+        if os.path.exists(outpath):
+
+            try:
+                os.remove(outpath)
+            except Exception:
+                pass
 
 
 # ============================================================
-# FIND LATEST RRFS CYCLE
+# GET 2-D LAT/LON + FIELD
+# ============================================================
+
+def get_lat_lon(
+    da
+):
+
+    if (
+        "latitude" in da.coords
+        and
+        "longitude" in da.coords
+    ):
+
+        lat = np.asarray(
+            da.latitude.values
+        )
+
+        lon = to_lon180(
+            da.longitude.values
+        )
+
+    elif (
+        "lat" in da.coords
+        and
+        "lon" in da.coords
+    ):
+
+        lat = np.asarray(
+            da.lat.values
+        )
+
+        lon = to_lon180(
+            da.lon.values
+        )
+
+    else:
+
+        raise RuntimeError(
+            "Could not find latitude/longitude coordinates."
+        )
+
+    lat = np.squeeze(lat)
+    lon = np.squeeze(lon)
+
+    if lat.ndim != 2 or lon.ndim != 2:
+
+        raise RuntimeError(
+            f"Lat/lon not 2D. lat={lat.shape}, lon={lon.shape}"
+        )
+
+    return lat, lon
+
+
+def ensure_2d_field(
+    da,
+    label
+):
+
+    arr = np.asarray(
+        da.values,
+        dtype=float
+    )
+
+    arr = np.squeeze(arr)
+
+    if arr.ndim != 2:
+
+        raise RuntimeError(
+            f"{label} is not 2D after squeeze. "
+            f"Shape={arr.shape}, dims={getattr(da, 'dims', None)}"
+        )
+
+    return arr
+
+
+
+# ============================================================
+# FIND LATEST AVAILABLE RRFS CYCLE USING .IDX
 # ============================================================
 
 def find_latest_available_rrfs_cycle(
@@ -1004,11 +1472,9 @@ def find_latest_available_rrfs_cycle(
         )
         -
         timedelta(
-            minutes=
-                CYCLE_DELAY_MINUTES
+            minutes=CYCLE_DELAY_MINUTES
         )
     )
-
 
     print("")
     print("=" * 70)
@@ -1018,1198 +1484,76 @@ def find_latest_available_rrfs_cycle(
     )
     print("=" * 70)
 
-
     for back in range(
         max_back_hours + 1
     ):
 
-        dt = (
+        dt_aware = (
             now
             -
-            timedelta(
-                hours=back
-            )
+            timedelta(hours=back)
         )
 
-
-        if (
-            dt.hour
-            not in
-            VALID_RRFS_CYCLES
-        ):
-
+        if dt_aware.hour not in VALID_RRFS_CYCLES:
             continue
 
-
-        dt = dt.replace(
-            minute=0,
-            second=0,
-            microsecond=0,
-            tzinfo=None
+        # Make tz-naive for the rest of the script.
+        dt = datetime(
+            dt_aware.year,
+            dt_aware.month,
+            dt_aware.day,
+            dt_aware.hour
         )
 
-
-        test_url = rrfs_grib_url(
+        test_idx = rrfs_idx_url(
             dt,
             1,
             product="2dfld"
         )
 
-
         print(
-            f"Checking RRFS "
-            f"{dt:%Y%m%d %HZ}..."
+            f"Checking RRFS {dt:%Y%m%d %HZ}..."
         )
-
-
-        if url_exists(
-            test_url
-        ):
-
-            print("")
-            print(
-                f"Latest RRFS cycle found: "
-                f"{dt:%Y%m%d %HZ}"
-            )
-
-
-            print(
-                "Matched GRIB:",
-                test_url
-            )
-
-
-            return dt
-
-
-    raise RuntimeError(
-        "Could not find recent "
-        "RRFS parallel cycle."
-    )
-
-
-# ============================================================
-# FULL GRIB DOWNLOAD
-# ============================================================
-
-def download_full_grib(
-    init_dt,
-    fhr,
-    product
-):
-
-    url = rrfs_grib_url(
-        init_dt,
-        fhr,
-        product=product
-    )
-
-
-    filename = os.path.basename(
-        url
-    )
-
-
-    outpath = os.path.join(
-        DATA_DIR,
-        filename
-    )
-
-
-    if (
-        os.path.exists(
-            outpath
-        )
-        and
-        os.path.getsize(
-            outpath
-        )
-        >
-        1_000_000
-    ):
-
-        print(
-            "Using cached GRIB:",
-            outpath
-        )
-
-
-        return outpath
-
-
-    last_error = None
-
-
-    for attempt in range(
-        1,
-        DOWNLOAD_ATTEMPTS + 1
-    ):
 
         try:
 
-            print("")
-            print(
-                f"Downloading {product} "
-                f"F{fhr:03d}"
+            r = requests.get(
+                test_idx,
+                timeout=15
             )
-
-
-            print(
-                url
-            )
-
-
-            print(
-                f"Attempt "
-                f"{attempt}/"
-                f"{DOWNLOAD_ATTEMPTS}"
-            )
-
-
-            with requests.get(
-                url,
-                stream=True,
-                timeout=180
-            ) as r:
-
-                r.raise_for_status()
-
-
-                total_bytes = 0
-
-
-                with open(
-                    outpath,
-                    "wb"
-                ) as f:
-
-                    for chunk in r.iter_content(
-                        chunk_size=
-                            8
-                            *
-                            1024
-                            *
-                            1024
-                    ):
-
-                        if not chunk:
-
-                            continue
-
-
-                        f.write(
-                            chunk
-                        )
-
-
-                        total_bytes += len(
-                            chunk
-                        )
-
-
-                        if (
-                            total_bytes
-                            %
-                            (
-                                100
-                                *
-                                1024
-                                *
-                                1024
-                            )
-                            <
-                            len(
-                                chunk
-                            )
-                        ):
-
-                            print(
-                                f"  "
-                                f"{total_bytes / 1024 / 1024:.0f} MB"
-                            )
-
 
             if (
-                not os.path.exists(
-                    outpath
+                r.status_code == 200
+                and
+                len(r.text) > 100
+                and
+                (
+                    "REFC" in r.text
+                    or
+                    "REFD" in r.text
                 )
-                or
-                os.path.getsize(
-                    outpath
-                )
-                <
-                1_000_000
             ):
 
-                raise RuntimeError(
-                    "Downloaded GRIB "
-                    "appears incomplete."
+                print("")
+                print(
+                    f"Latest RRFS cycle found: {dt:%Y%m%d %HZ}"
+                )
+                print(
+                    "Matched IDX:",
+                    test_idx
                 )
 
-
-            print(
-                "Downloaded:",
-                outpath
-            )
-
-
-            print(
-                f"Size: "
-                f"{os.path.getsize(outpath) / 1024 / 1024:.1f} MB"
-            )
-
-
-            return outpath
-
+                return dt
 
         except Exception as e:
 
-            last_error = e
-
-
             print(
-                f"Download failed: "
-                f"{e}"
+                f"  unavailable: {e}"
             )
-
-
-            if os.path.exists(
-                outpath
-            ):
-
-                try:
-
-                    os.remove(
-                        outpath
-                    )
-
-                except Exception:
-
-                    pass
-
-
-            if (
-                attempt
-                <
-                DOWNLOAD_ATTEMPTS
-            ):
-
-                print(
-                    f"Retrying in "
-                    f"{DOWNLOAD_RETRY_SECONDS} seconds..."
-                )
-
-
-                time.sleep(
-                    DOWNLOAD_RETRY_SECONDS
-                )
-
 
     raise RuntimeError(
-        f"Could not download "
-        f"{product} F{fhr:03d}. "
-        f"Last error: {last_error}"
+        "Could not find recent RRFS parallel cycle."
     )
-
-
-# ============================================================
-# SAFE ECCODES GET
-# ============================================================
-
-def safe_codes_get(
-    gid,
-    key,
-    default=""
-):
-
-    try:
-
-        return codes_get(
-            gid,
-            key
-        )
-
-
-    except Exception:
-
-        return default
-
-
-# ============================================================
-# BUILD SEARCHABLE GRIB MESSAGE DESCRIPTION
-#
-# This lets us retain search terms similar to the old IDX
-# workflow even though we're scanning GRIB messages directly.
-# ============================================================
-
-def grib_message_description(
-    gid
-):
-
-    short_name = str(
-        safe_codes_get(
-            gid,
-            "shortName",
-            ""
-        )
-    )
-
-
-    name = str(
-        safe_codes_get(
-            gid,
-            "name",
-            ""
-        )
-    )
-
-
-    parameter_name = str(
-        safe_codes_get(
-            gid,
-            "parameterName",
-            ""
-        )
-    )
-
-
-    type_level = str(
-        safe_codes_get(
-            gid,
-            "typeOfLevel",
-            ""
-        )
-    )
-
-
-    level = safe_codes_get(
-        gid,
-        "level",
-        ""
-    )
-
-
-    top_level = safe_codes_get(
-        gid,
-        "topLevel",
-        ""
-    )
-
-
-    bottom_level = safe_codes_get(
-        gid,
-        "bottomLevel",
-        ""
-    )
-
-
-    step_type = str(
-        safe_codes_get(
-            gid,
-            "stepType",
-            ""
-        )
-    )
-
-
-    pieces = [
-
-        short_name,
-        short_name.upper(),
-
-        name,
-        parameter_name,
-
-        type_level,
-
-        str(
-            level
-        ),
-
-        str(
-            top_level
-        ),
-
-        str(
-            bottom_level
-        ),
-
-        step_type,
-
-    ]
-
-
-    # --------------------------------------------------------
-    # ADD OLD-GRIB/IDX STYLE ALIASES
-    # --------------------------------------------------------
-
-    s = short_name.lower()
-
-
-    if s in (
-        "u",
-        "ugrd"
-    ):
-
-        pieces.extend(
-            [
-                "UGRD",
-                "U component of wind"
-            ]
-        )
-
-
-    if s in (
-        "v",
-        "vgrd"
-    ):
-
-        pieces.extend(
-            [
-                "VGRD",
-                "V component of wind"
-            ]
-        )
-
-
-    if s in (
-        "t",
-        "2t",
-        "tmp"
-    ):
-
-        pieces.extend(
-            [
-                "TMP",
-                "temperature"
-            ]
-        )
-
-
-    if s in (
-        "sp",
-        "pres",
-        "prmsl"
-    ):
-
-        pieces.extend(
-            [
-                "PRES",
-                "pressure"
-            ]
-        )
-
-
-    if (
-        "refd"
-        in s
-    ):
-
-        pieces.append(
-            "REFD"
-        )
-
-
-    if (
-        "refc"
-        in s
-    ):
-
-        pieces.append(
-            "REFC"
-        )
-
-
-    if (
-        "mxuphl"
-        in s
-        or
-        "updraft helicity"
-        in name.lower()
-    ):
-
-        pieces.append(
-            "MXUPHL"
-        )
-
-
-    # --------------------------------------------------------
-    # HUMAN-READABLE LEVEL ALIASES
-    # --------------------------------------------------------
-
-    if (
-        type_level
-        ==
-        "heightAboveGround"
-    ):
-
-        pieces.extend(
-            [
-                f"{level} m",
-                f"{level} m above ground"
-            ]
-        )
-
-
-    if (
-        "isobaric"
-        in
-        type_level.lower()
-    ):
-
-        pieces.extend(
-            [
-                f"{level} mb",
-                f"{level} hPa"
-            ]
-        )
-
-
-    # Layer aliases helpful for UH
-    if (
-        top_level != ""
-        and
-        bottom_level != ""
-    ):
-
-        pieces.extend(
-            [
-                f"{top_level}-{bottom_level}",
-                f"{bottom_level}-{top_level}",
-                f"{top_level} - {bottom_level}",
-                f"{bottom_level} - {top_level}"
-            ]
-        )
-
-
-    return " | ".join(
-        str(
-            x
-        )
-        for x
-        in pieces
-    )
-
-
-# ============================================================
-# MATCH OLD TERM SETS AGAINST A GRIB MESSAGE
-# ============================================================
-
-def matches_term_set(
-    description,
-    terms
-):
-
-    desc_lower = (
-        description
-        .lower()
-    )
-
-
-    return all(
-        term.lower()
-        in
-        desc_lower
-
-        for term
-        in terms
-    )
-
-
-# ============================================================
-# DETERMINE GRIB GRID SHAPE
-# ============================================================
-
-def get_grib_shape(
-    gid,
-    values
-):
-
-    nx = safe_codes_get(
-        gid,
-        "Nx",
-        None
-    )
-
-
-    ny = safe_codes_get(
-        gid,
-        "Ny",
-        None
-    )
-
-
-    if (
-        nx in (
-            None,
-            "",
-            0
-        )
-        or
-        ny in (
-            None,
-            "",
-            0
-        )
-    ):
-
-        nx = safe_codes_get(
-            gid,
-            "Ni",
-            None
-        )
-
-
-        ny = safe_codes_get(
-            gid,
-            "Nj",
-            None
-        )
-
-
-    if (
-        nx in (
-            None,
-            "",
-            0
-        )
-        or
-        ny in (
-            None,
-            "",
-            0
-        )
-    ):
-
-        raise RuntimeError(
-            "Could not determine "
-            "GRIB grid dimensions."
-        )
-
-
-    nx = int(
-        nx
-    )
-
-
-    ny = int(
-        ny
-    )
-
-
-    if (
-        nx
-        *
-        ny
-        !=
-        len(
-            values
-        )
-    ):
-
-        raise RuntimeError(
-            f"GRIB dimensions "
-            f"{ny}x{nx} do not equal "
-            f"value count {len(values)}."
-        )
-
-
-    return (
-        ny,
-        nx
-    )
-
-
-# ============================================================
-# EXTRACT ARRAY + LAT/LON FROM MESSAGE
-# ============================================================
-
-def message_to_arrays(
-    gid
-):
-
-    values = np.asarray(
-        codes_get_array(
-            gid,
-            "values"
-        ),
-        dtype=float
-    )
-
-
-    latitudes = np.asarray(
-        codes_get_array(
-            gid,
-            "latitudes"
-        ),
-        dtype=float
-    )
-
-
-    longitudes = np.asarray(
-        codes_get_array(
-            gid,
-            "longitudes"
-        ),
-        dtype=float
-    )
-
-
-    (
-        ny,
-        nx
-    ) = get_grib_shape(
-        gid,
-        values
-    )
-
-
-    field = values.reshape(
-        ny,
-        nx
-    )
-
-
-    lat = latitudes.reshape(
-        ny,
-        nx
-    )
-
-
-    lon = longitudes.reshape(
-        ny,
-        nx
-    )
-
-
-    lon = to_lon180(
-        lon
-    )
-
-
-    return (
-        field,
-        lat,
-        lon
-    )
-
-
-# ============================================================
-# FIELD SEARCH CONFIGURATION
-# ============================================================
-
-TWO_D_FIELD_SEARCHES = {
-
-    "reflectivity": [
-
-        [
-            "REFD",
-            "1000 m"
-        ],
-
-        [
-            "REFC"
-        ],
-
-        [
-            "REFD"
-        ],
-
-    ],
-
-
-    "uh25": [
-
-        [
-            "MXUPHL",
-            "5000-2000"
-        ],
-
-        [
-            "MXUPHL",
-            "5000 - 2000"
-        ],
-
-        [
-            "MXUPHL"
-        ],
-
-    ],
-
-
-    "uh03": [
-
-        [
-            "MXUPHL",
-            "3000-0"
-        ],
-
-        [
-            "MXUPHL",
-            "3000 - 0"
-        ],
-
-    ],
-
-
-    "sim_ir": [
-
-        [
-            "SBT123"
-        ],
-
-        [
-            "SBT124"
-        ],
-
-        [
-            "brightness"
-        ],
-
-        [
-            "satellite"
-        ],
-
-    ],
-
-
-    "t2": [
-
-        [
-            "TMP",
-            "2 m above ground"
-        ],
-
-        [
-            "TMP",
-            "2 m"
-        ],
-
-        [
-            "2 metre temperature"
-        ],
-
-    ],
-
-
-    "psfc": [
-
-        [
-            "PRES",
-            "surface"
-        ],
-
-        [
-            "surface pressure"
-        ],
-
-    ],
-
-
-    "u_stm": [
-
-        [
-            "UEID"
-        ],
-
-        [
-            "USTM"
-        ],
-
-        [
-            "BUNK",
-            "U"
-        ],
-
-    ],
-
-
-    "v_stm": [
-
-        [
-            "VEID"
-        ],
-
-        [
-            "VSTM"
-        ],
-
-        [
-            "BUNK",
-            "V"
-        ],
-
-    ],
-
-}
-
-
-PRESSURE_FIELD_SEARCHES = {
-
-    "u700": [
-
-        [
-            "UGRD",
-            "700 mb"
-        ],
-
-    ],
-
-
-    "v700": [
-
-        [
-            "VGRD",
-            "700 mb"
-        ],
-
-    ],
-
-
-    "u600": [
-
-        [
-            "UGRD",
-            "600 mb"
-        ],
-
-    ],
-
-
-    "v600": [
-
-        [
-            "VGRD",
-            "600 mb"
-        ],
-
-    ],
-
-
-    "u500": [
-
-        [
-            "UGRD",
-            "500 mb"
-        ],
-
-    ],
-
-
-    "v500": [
-
-        [
-            "VGRD",
-            "500 mb"
-        ],
-
-    ],
-
-}
-
-
-# ============================================================
-# SCAN ONE GRIB AND EXTRACT ALL REQUESTED FIELDS IN ONE PASS
-# ============================================================
-
-def extract_fields_from_grib(
-    path,
-    searches,
-    optional_fields=None
-):
-
-    if optional_fields is None:
-
-        optional_fields = set()
-
-
-    results = {}
-
-
-    print("")
-    print(
-        "Scanning GRIB:",
-        path
-    )
-
-
-    with open(
-        path,
-        "rb"
-    ) as f:
-
-        message_number = 0
-
-
-        while True:
-
-            gid = codes_grib_new_from_file(
-                f
-            )
-
-
-            if gid is None:
-
-                break
-
-
-            message_number += 1
-
-
-            try:
-
-                description = (
-                    grib_message_description(
-                        gid
-                    )
-                )
-
-
-                # ---------------------------------------------
-                # ONLY TEST FIELDS THAT HAVE NOT BEEN FOUND
-                # ---------------------------------------------
-
-                for field_name, term_sets in searches.items():
-
-                    if (
-                        field_name
-                        in
-                        results
-                    ):
-
-                        continue
-
-
-                    matched = False
-
-
-                    for terms in term_sets:
-
-                        if matches_term_set(
-                            description,
-                            terms
-                        ):
-
-                            (
-                                field,
-                                lat,
-                                lon
-                            ) = message_to_arrays(
-                                gid
-                            )
-
-
-                            results[
-                                field_name
-                            ] = {
-
-                                "field":
-                                    field,
-
-                                "lat":
-                                    lat,
-
-                                "lon":
-                                    lon,
-
-                                "description":
-                                    description,
-
-                            }
-
-
-                            print("")
-                            print(
-                                f"Matched "
-                                f"{field_name}:"
-                            )
-
-
-                            print(
-                                description
-                            )
-
-
-                            matched = True
-
-                            break
-
-
-                    if matched:
-
-                        continue
-
-
-                # ---------------------------------------------
-                # STOP EARLY IF EVERYTHING IS FOUND
-                # ---------------------------------------------
-
-                if (
-                    len(
-                        results
-                    )
-                    ==
-                    len(
-                        searches
-                    )
-                ):
-
-                    break
-
-
-            finally:
-
-                codes_release(
-                    gid
-                )
-
-
-    # ========================================================
-    # REPORT MISSING FIELDS
-    # ========================================================
-
-    missing_required = []
-
-
-    for field_name in searches:
-
-        if (
-            field_name
-            not in
-            results
-        ):
-
-            if (
-                field_name
-                in
-                optional_fields
-            ):
-
-                print(
-                    f"Optional field "
-                    f"{field_name} not found."
-                )
-
-
-            else:
-
-                missing_required.append(
-                    field_name
-                )
-
-
-    if missing_required:
-
-        raise RuntimeError(
-            "Required RRFS fields not found: "
-            +
-            ", ".join(
-                missing_required
-            )
-        )
-
-
-    return results
 
 
 # ============================================================
@@ -2909,574 +2253,425 @@ def load_rrfs_fields_once(
 
     print("")
     print("=" * 70)
-
-
     print(
         f"Loading RRFS | "
-        f"Init "
-        f"{init_dt:%Y-%m-%d %HZ} | "
+        f"Init {init_dt:%Y-%m-%d %HZ} | "
         f"F{fhr:03d}"
     )
-
-
     print("=" * 70)
 
+    # ========================================================
+    # REFLECTIVITY
+    # ========================================================
 
-    two_d_path = None
+    refl_da = rrfs_idx_field(
+        init_dt,
+        fhr,
+        [
+            ["REFD", "1000 m above ground"],
+            ["REFC", "entire atmosphere"],
+            ["REFC"],
+            ["REFD", "1000 m"],
+        ],
+        "reflectivity",
+        product="2dfld",
+        required=True
+    )
 
-    prs_path = None
+    lat, lon = get_lat_lon(
+        refl_da
+    )
 
+    refl = ensure_2d_field(
+        refl_da,
+        "reflectivity"
+    )
 
-    try:
+    refl = np.where(
+        refl >= REF_LEVELS[0],
+        refl,
+        np.nan
+    )
 
-        # ====================================================
-        # DOWNLOAD FULL 2DFLD GRIB
-        # ====================================================
+    # ========================================================
+    # 2-5 KM MAX UH
+    # ========================================================
 
-        two_d_path = download_full_grib(
-            init_dt,
-            fhr,
-            "2dfld"
+    uh25_da = rrfs_idx_field(
+        init_dt,
+        fhr,
+        [
+            ["MXUPHL", "5000-2000 m above ground"],
+            ["MXUPHL", "5000-2000"],
+        ],
+        "2-5km UH",
+        product="2dfld",
+        required=False
+    )
+
+    if uh25_da is not None:
+        uh25 = ensure_2d_field(
+            uh25_da,
+            "2-5km UH"
         )
-
-
-        # ====================================================
-        # EXTRACT ALL 2-D FIELDS IN ONE PASS
-        # ====================================================
-
-        two_d = extract_fields_from_grib(
-
-            two_d_path,
-
-            TWO_D_FIELD_SEARCHES,
-
-            optional_fields={
-                "uh25",
-                "uh03",
-                "sim_ir",
-                "u_stm",
-                "v_stm"
-            }
-        )
-
-
-        # ====================================================
-        # REQUIRED MAIN GRID
-        # ====================================================
-
-        refl = np.asarray(
-            two_d[
-                "reflectivity"
-            ][
-                "field"
-            ],
-            dtype=float
-        )
-
-
-        lat = np.asarray(
-            two_d[
-                "reflectivity"
-            ][
-                "lat"
-            ],
-            dtype=float
-        )
-
-
-        lon = np.asarray(
-            two_d[
-                "reflectivity"
-            ][
-                "lon"
-            ],
-            dtype=float
-        )
-
-
-        refl = np.where(
-            refl
-            >=
-            REF_LEVELS[
-                0
-            ],
+    else:
+        uh25 = np.full_like(
             refl,
             np.nan
         )
 
+    # ========================================================
+    # 0-3 KM MAX UH
+    # ========================================================
 
-        # ====================================================
-        # OPTIONAL UH
-        # ====================================================
+    uh03_da = rrfs_idx_field(
+        init_dt,
+        fhr,
+        [
+            ["MXUPHL", "3000-0 m above ground"],
+            ["MXUPHL", "3000-0"],
+        ],
+        "0-3km UH",
+        product="2dfld",
+        required=False
+    )
 
-        if (
-            "uh25"
-            in
-            two_d
-        ):
-
-            uh25 = np.asarray(
-                two_d[
-                    "uh25"
-                ][
-                    "field"
-                ],
-                dtype=float
-            )
-
-
-        else:
-
-            uh25 = np.full_like(
-                refl,
-                np.nan
-            )
-
-
-        if (
-            "uh03"
-            in
-            two_d
-        ):
-
-            uh03 = np.asarray(
-                two_d[
-                    "uh03"
-                ][
-                    "field"
-                ],
-                dtype=float
-            )
-
-
-        else:
-
-            uh03 = np.full_like(
-                refl,
-                np.nan
-            )
-
-
-        # ====================================================
-        # OPTIONAL SIM IR
-        # ====================================================
-
-        if (
-            "sim_ir"
-            in
-            two_d
-        ):
-
-            ir_c = k_to_c(
-                two_d[
-                    "sim_ir"
-                ][
-                    "field"
-                ]
-            )
-
-
-        else:
-
-            ir_c = np.full_like(
-                refl,
-                np.nan
-            )
-
-
-        # ====================================================
-        # 2-M TEMP / SURFACE PRESSURE
-        # ====================================================
-
-        t2_k = np.asarray(
-            two_d[
-                "t2"
-            ][
-                "field"
-            ],
-            dtype=float
+    if uh03_da is not None:
+        uh03 = ensure_2d_field(
+            uh03_da,
+            "0-3km UH"
+        )
+    else:
+        uh03 = np.full_like(
+            refl,
+            np.nan
         )
 
+    # ========================================================
+    # SIMULATED IR
+    # ========================================================
 
-        ps_pa = np.asarray(
-            two_d[
-                "psfc"
-            ][
-                "field"
-            ],
-            dtype=float
+    ir_da = rrfs_idx_field(
+        init_dt,
+        fhr,
+        [
+            ["SBT123"],
+            ["SBT124"],
+            ["brightness"],
+            ["satellite"],
+        ],
+        "simulated IR",
+        product="2dfld",
+        required=False
+    )
+
+    if ir_da is not None:
+        ir_c = k_to_c(
+            ensure_2d_field(
+                ir_da,
+                "simulated IR"
+            )
+        )
+    else:
+        ir_c = np.full_like(
+            refl,
+            np.nan
         )
 
+    # ========================================================
+    # 2-M TEMPERATURE
+    # ========================================================
 
-        # ====================================================
-        # THETA COLD POOL
-        # ====================================================
+    t2_da = rrfs_idx_field(
+        init_dt,
+        fhr,
+        [
+            ["TMP", "2 m above ground"],
+            ["TMP", "2 m"],
+        ],
+        "2m temperature",
+        product="2dfld",
+        required=True
+    )
 
-        theta = (
-            t2_k
-            *
-            (
-                100000.0
-                /
-                ps_pa
-            )**0.286
+    # ========================================================
+    # SURFACE PRESSURE
+    # ========================================================
+
+    ps_da = rrfs_idx_field(
+        init_dt,
+        fhr,
+        [
+            ["PRES", "surface"],
+        ],
+        "surface pressure",
+        product="2dfld",
+        required=True
+    )
+
+    t2_k = ensure_2d_field(
+        t2_da,
+        "2m temperature"
+    )
+
+    ps_pa = ensure_2d_field(
+        ps_da,
+        "surface pressure"
+    )
+
+    # ========================================================
+    # THETA COLD-POOL ANOMALY
+    # ========================================================
+
+    theta = (
+        t2_k
+        *
+        (
+            100000.0
+            /
+            ps_pa
+        )**0.286
+    )
+
+    theta_bg = gaussian_filter(
+        theta,
+        sigma=18
+    )
+
+    theta_prime = (
+        theta
+        -
+        theta_bg
+    )
+
+    # ========================================================
+    # 700 / 600 / 500 MB WINDS
+    # ========================================================
+
+    u700_da = rrfs_idx_field(
+        init_dt, fhr,
+        [["UGRD", "700 mb"]],
+        "700mb U wind",
+        product="prslev",
+        required=True
+    )
+
+    v700_da = rrfs_idx_field(
+        init_dt, fhr,
+        [["VGRD", "700 mb"]],
+        "700mb V wind",
+        product="prslev",
+        required=True
+    )
+
+    u600_da = rrfs_idx_field(
+        init_dt, fhr,
+        [["UGRD", "600 mb"]],
+        "600mb U wind",
+        product="prslev",
+        required=True
+    )
+
+    v600_da = rrfs_idx_field(
+        init_dt, fhr,
+        [["VGRD", "600 mb"]],
+        "600mb V wind",
+        product="prslev",
+        required=True
+    )
+
+    u500_da = rrfs_idx_field(
+        init_dt, fhr,
+        [["UGRD", "500 mb"]],
+        "500mb U wind",
+        product="prslev",
+        required=True
+    )
+
+    v500_da = rrfs_idx_field(
+        init_dt, fhr,
+        [["VGRD", "500 mb"]],
+        "500mb V wind",
+        product="prslev",
+        required=True
+    )
+
+    pr_lat, pr_lon = get_lat_lon(
+        u700_da
+    )
+
+    u46_pr = np.nanmean(
+        np.stack(
+            [
+                ensure_2d_field(u700_da, "700mb U wind"),
+                ensure_2d_field(u600_da, "600mb U wind"),
+                ensure_2d_field(u500_da, "500mb U wind"),
+            ]
+        ),
+        axis=0
+    )
+
+    v46_pr = np.nanmean(
+        np.stack(
+            [
+                ensure_2d_field(v700_da, "700mb V wind"),
+                ensure_2d_field(v600_da, "600mb V wind"),
+                ensure_2d_field(v500_da, "500mb V wind"),
+            ]
+        ),
+        axis=0
+    )
+
+    u46_native = interp_to_target_grid(
+        pr_lat,
+        pr_lon,
+        u46_pr,
+        lat,
+        lon
+    )
+
+    v46_native = interp_to_target_grid(
+        pr_lat,
+        pr_lon,
+        v46_pr,
+        lat,
+        lon
+    )
+
+    # ========================================================
+    # RRFS STORM MOTION
+    # ========================================================
+
+    u_stm_da = rrfs_idx_field(
+        init_dt,
+        fhr,
+        [
+            ["USTM", "6000-0 m above ground"],
+            ["USTM"],
+            ["UEID"],
+        ],
+        "storm motion U",
+        product="2dfld",
+        required=False
+    )
+
+    v_stm_da = rrfs_idx_field(
+        init_dt,
+        fhr,
+        [
+            ["VSTM", "6000-0 m above ground"],
+            ["VSTM"],
+            ["VEID"],
+        ],
+        "storm motion V",
+        product="2dfld",
+        required=False
+    )
+
+    if (
+        u_stm_da is not None
+        and
+        v_stm_da is not None
+    ):
+
+        print(
+            "Using RRFS USTM/VSTM storm motion "
+            "for SR winds."
         )
 
-
-        theta_bg = gaussian_filter(
-            theta,
-            sigma=18
+        stm_lat, stm_lon = get_lat_lon(
+            u_stm_da
         )
 
+        u_stm_native = interp_to_target_grid(
+            stm_lat,
+            stm_lon,
+            ensure_2d_field(
+                u_stm_da,
+                "storm motion U"
+            ),
+            lat,
+            lon
+        )
 
-        theta_prime = (
-            theta
+        v_stm_native = interp_to_target_grid(
+            stm_lat,
+            stm_lon,
+            ensure_2d_field(
+                v_stm_da,
+                "storm motion V"
+            ),
+            lat,
+            lon
+        )
+
+        sr_u46 = (
+            u46_native
             -
-            theta_bg
+            u_stm_native
         )
 
-
-        # ====================================================
-        # DOWNLOAD PRESSURE-LEVEL GRIB
-        # ====================================================
-
-        prs_path = download_full_grib(
-            init_dt,
-            fhr,
-            "prslev"
+        sr_v46 = (
+            v46_native
+            -
+            v_stm_native
         )
 
-
-        # ====================================================
-        # EXTRACT 700/600/500 WINDS IN ONE PASS
-        # ====================================================
-
-        prs = extract_fields_from_grib(
-            prs_path,
-            PRESSURE_FIELD_SEARCHES
+        storm_motion_source = (
+            "RRFS USTM/VSTM"
         )
 
+    else:
 
-        pr_lat = np.asarray(
-            prs[
-                "u700"
-            ][
-                "lat"
-            ],
-            dtype=float
+        print(
+            "RRFS USTM/VSTM not available. "
+            "Using manual storm motion."
         )
 
-
-        pr_lon = np.asarray(
-            prs[
-                "u700"
-            ][
-                "lon"
-            ],
-            dtype=float
+        (
+            storm_u_scalar,
+            storm_v_scalar
+        ) = wind_from_dir_speed_to_uv(
+            MANUAL_STORM_MOTION_FROM_DEG,
+            kt_to_ms(
+                MANUAL_STORM_MOTION_SPEED_KT
+            )
         )
 
-
-        u46_pr = np.nanmean(
-
-            np.stack(
-                [
-
-                    prs[
-                        "u700"
-                    ][
-                        "field"
-                    ],
-
-                    prs[
-                        "u600"
-                    ][
-                        "field"
-                    ],
-
-                    prs[
-                        "u500"
-                    ][
-                        "field"
-                    ],
-
-                ]
-            ),
-
-            axis=0
-
-        )
-
-
-        v46_pr = np.nanmean(
-
-            np.stack(
-                [
-
-                    prs[
-                        "v700"
-                    ][
-                        "field"
-                    ],
-
-                    prs[
-                        "v600"
-                    ][
-                        "field"
-                    ],
-
-                    prs[
-                        "v500"
-                    ][
-                        "field"
-                    ],
-
-                ]
-            ),
-
-            axis=0
-
-        )
-
-
-        # ====================================================
-        # INTERPOLATE PRESSURE WINDS TO 2DFLD GRID
-        # ====================================================
-
-        u46_native = interp_to_target_grid(
-            pr_lat,
-            pr_lon,
-            u46_pr,
-            lat,
-            lon
-        )
-
-
-        v46_native = interp_to_target_grid(
-            pr_lat,
-            pr_lon,
-            v46_pr,
-            lat,
-            lon
-        )
-
-
-        # ====================================================
-        # STORM MOTION
-        # ====================================================
-
-        if (
-            "u_stm"
-            in
-            two_d
-            and
-            "v_stm"
-            in
-            two_d
-        ):
-
-            print(
-                "Using RRFS storm motion."
-            )
-
-
-            stm_lat = np.asarray(
-                two_d[
-                    "u_stm"
-                ][
-                    "lat"
-                ],
-                dtype=float
-            )
-
-
-            stm_lon = np.asarray(
-                two_d[
-                    "u_stm"
-                ][
-                    "lon"
-                ],
-                dtype=float
-            )
-
-
-            u_stm_native = interp_to_target_grid(
-                stm_lat,
-                stm_lon,
-
-                two_d[
-                    "u_stm"
-                ][
-                    "field"
-                ],
-
-                lat,
-                lon
-            )
-
-
-            v_stm_native = interp_to_target_grid(
-                stm_lat,
-                stm_lon,
-
-                two_d[
-                    "v_stm"
-                ][
-                    "field"
-                ],
-
-                lat,
-                lon
-            )
-
-
-            sr_u46 = (
-                u46_native
-                -
-                u_stm_native
-            )
-
-
-            sr_v46 = (
-                v46_native
-                -
-                v_stm_native
-            )
-
-
-            storm_motion_source = (
-                "RRFS storm motion"
-            )
-
-
-        else:
-
-            print(
-                "RRFS storm motion not found. "
-                "Using manual storm motion."
-            )
-
-
-            (
-                storm_u_scalar,
-                storm_v_scalar
-
-            ) = wind_from_dir_speed_to_uv(
-                MANUAL_STORM_MOTION_FROM_DEG,
-
-                kt_to_ms(
-                    MANUAL_STORM_MOTION_SPEED_KT
-                )
-            )
-
-
-            sr_u46 = (
-                u46_native
-                -
-                np.full_like(
-                    refl,
-                    storm_u_scalar
-                )
-            )
-
-
-            sr_v46 = (
-                v46_native
-                -
-                np.full_like(
-                    refl,
-                    storm_v_scalar
-                )
-            )
-
-
-            storm_motion_source = (
-                "Manual storm motion"
-            )
-
-
-        # ====================================================
-        # RETURN
-        # ====================================================
-
-        return {
-
-            "lat":
-                lat,
-
-            "lon":
-                lon,
-
-            "refl":
+        sr_u46 = (
+            u46_native
+            -
+            np.full_like(
                 refl,
+                storm_u_scalar
+            )
+        )
 
-            "uh25":
-                uh25,
+        sr_v46 = (
+            v46_native
+            -
+            np.full_like(
+                refl,
+                storm_v_scalar
+            )
+        )
 
-            "uh03":
-                uh03,
+        storm_motion_source = (
+            "Manual storm motion"
+        )
 
-            "ir_c":
-                ir_c,
-
-            "theta_prime":
-                theta_prime,
-
-            "sr_u46":
-                sr_u46,
-
-            "sr_v46":
-                sr_v46,
-
-            "storm_motion_source":
-                storm_motion_source,
-
-        }
-
-
-    finally:
-
-        # ====================================================
-        # DELETE HUGE GRIBS
-        # ====================================================
-
-        if DELETE_GRIB_AFTER_HOUR:
-
-            for path in (
-                two_d_path,
-                prs_path
-            ):
-
-                if (
-                    path
-                    and
-                    os.path.exists(
-                        path
-                    )
-                ):
-
-                    try:
-
-                        os.remove(
-                            path
-                        )
-
-
-                        print(
-                            "Deleted large GRIB:",
-                            path
-                        )
-
-
-                    except Exception as e:
-
-                        print(
-                            f"Could not delete "
-                            f"{path}: {e}"
-                        )
-
-
-        gc.collect()
+    return {
+        "lat": lat,
+        "lon": lon,
+        "refl": refl,
+        "uh25": uh25,
+        "uh03": uh03,
+        "ir_c": ir_c,
+        "theta_prime": theta_prime,
+        "sr_u46": sr_u46,
+        "sr_v46": sr_v46,
+        "storm_motion_source": storm_motion_source,
+    }
 
 
 # ============================================================
