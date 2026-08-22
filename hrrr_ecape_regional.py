@@ -1239,7 +1239,7 @@ def compute_CAPES_DRAG(T0,p0,q0,start_loc,fracent,prate,z0,T1,T2,Radius,V_SR):
 # ============================================================
 
 # LATEST HRRR | REGIONAL DOMAIN
-# ORIGINAL PETERS ECAPE + 0-3 KM BULK SHEAR
+# ORIGINAL PETERS ECAPE + 0-1 KM SRH + 0-6 KM BULK SHEAR
 # + LATEST HRRR SOUNDING AT TEST POINT
 # ============================================================
 #
@@ -1800,12 +1800,14 @@ BARB_SKIP = 3
 # ------------------------------------------------------------
 # 0-1 KM MEAN STORM-RELATIVE WIND CONTOURS
 #
-# This is the SAME V_SR returned by the original Peters
-# compute_VSR() routine and used directly in the ECAPE
-# calculation. Values are contoured in knots.
+# 0-1 km storm-relative helicity contours.
+# Storm motion is the SAME Bunkers-style motion returned by
+# the original Peters compute_VSR() routine, keeping the
+# kinematic diagnostics internally consistent with ECAPE.
+# Units: m^2 s^-2.
 # ------------------------------------------------------------
 
-VSR_LEVELS_KT = [15, 20, 25, 30]
+SRH_LEVELS = [100, 150, 200, 250, 300, 400]
 
 # ------------------------------------------------------------
 # SITE OUTPUT
@@ -3320,32 +3322,108 @@ def calculate_original_ecape(
             LFC
         )
 
-        # 0-3 km bulk shear vector.
-        u3 = np.interp(
-            3000.0,
-            z0,
-            u0
-        )
+        # --------------------------------------------------------
+        # 0-1 KM STORM-RELATIVE HELICITY
+        #
+        # Use the same Peters/Bunkers storm motion returned above
+        # (C_x, C_y) so ECAPE and SRH use a consistent storm motion.
+        # --------------------------------------------------------
 
-        v3 = np.interp(
-            3000.0,
-            z0,
-            v0
-        )
+        srh01 = np.nan
 
-        shear_u = (
-            u3
-            - u0[
-                0
-            ]
-        )
+        if (
+            np.nanmax(
+                z0
+            )
+            >=
+            1000.0
+        ):
 
-        shear_v = (
-            v3
-            - v0[
-                0
-            ]
-        )
+            try:
+
+                _, _, srh_total = (
+                    mpcalc.storm_relative_helicity(
+                        z0
+                        *
+                        units.meter,
+                        u0
+                        *
+                        units("m/s"),
+                        v0
+                        *
+                        units("m/s"),
+                        depth=
+                            1000.0
+                            *
+                            units.meter,
+                        storm_u=
+                            C_x
+                            *
+                            units("m/s"),
+                        storm_v=
+                            C_y
+                            *
+                            units("m/s")
+                    )
+                )
+
+                srh01 = float(
+                    srh_total
+                    .to(
+                        "meter**2 / second**2"
+                    )
+                    .magnitude
+                )
+
+            except Exception:
+
+                srh01 = np.nan
+
+
+        # --------------------------------------------------------
+        # 0-6 KM BULK SHEAR VECTOR
+        # --------------------------------------------------------
+
+        if (
+            np.nanmax(
+                z0
+            )
+            >=
+            6000.0
+        ):
+
+            u6 = np.interp(
+                6000.0,
+                z0,
+                u0
+            )
+
+            v6 = np.interp(
+                6000.0,
+                z0,
+                v0
+            )
+
+            shear_u = (
+                u6
+                -
+                u0[
+                    0
+                ]
+            )
+
+            shear_v = (
+                v6
+                -
+                v0[
+                    0
+                ]
+            )
+
+        else:
+
+            shear_u = np.nan
+            shear_v = np.nan
 
         if return_details:
 
@@ -3363,6 +3441,7 @@ def calculate_original_ecape(
                 "Radius": Radius,
                 "LCL": LCL,
                 "lcl_lfc_rh": lcl_lfc_rh,
+                "srh01": srh01,
                 "shear_u": shear_u,
                 "shear_v": shear_v,
             }
@@ -3862,7 +3941,7 @@ def process_forecast_hour(
 
 
     # ============================================================
-    # CALCULATE SAMPLED LBF ECAPE GRID
+    # CALCULATE SAMPLED REGIONAL ECAPE GRID
     # ============================================================
 
     ny, nx = (
@@ -3915,7 +3994,7 @@ def process_forecast_hour(
         dtype=float
     )
 
-    vsr_sample_kt = np.full(
+    srh01_sample = np.full(
         calc_lat.shape,
         np.nan,
         dtype=float
@@ -3938,7 +4017,7 @@ def process_forecast_hour(
     )
 
     print(
-        "CALCULATING LBF ECAPE"
+        "CALCULATING REGIONAL ECAPE"
     )
 
     print(
@@ -3958,7 +4037,7 @@ def process_forecast_hour(
 
     progress = tqdm(
         total=total_profiles,
-        desc="LBF ECAPE"
+        desc="Regional ECAPE"
     )
 
 
@@ -4014,14 +4093,13 @@ def process_forecast_hour(
                         ]
                     )
 
-                    vsr_sample_kt[
+                    srh01_sample[
                         jj,
                         ii
                     ] = (
                         details[
-                            "V_SR"
+                            "srh01"
                         ]
-                        * 1.94384
                     )
 
             progress.update(
@@ -4062,7 +4140,7 @@ def process_forecast_hour(
 
 
     # ============================================================
-    # INTERPOLATE ECAPE BACK TO FULL HRRR LBF GRID
+    # INTERPOLATE ECAPE BACK TO FULL HRRR REGIONAL GRID
     # ============================================================
 
     points = np.column_stack(
@@ -4133,35 +4211,35 @@ def process_forecast_hour(
 
 
     # ============================================================
-    # INTERPOLATE 0-1 KM VSR TO FULL HRRR LBF GRID
+    # INTERPOLATE 0-1 KM SRH TO FULL HRRR REGIONAL GRID
     # ============================================================
 
-    vsr_finite = np.isfinite(
-        vsr_sample_kt
+    srh_finite = np.isfinite(
+        srh01_sample
     )
 
     if np.count_nonzero(
-        vsr_finite
+        srh_finite
     ) >= 3:
 
-        vsr_points = np.column_stack(
+        srh_points = np.column_stack(
             (
                 calc_lon[
-                    vsr_finite
+                    srh_finite
                 ],
                 calc_lat[
-                    vsr_finite
+                    srh_finite
                 ]
             )
         )
 
-        vsr_values = vsr_sample_kt[
-            vsr_finite
+        srh_values = srh01_sample[
+            srh_finite
         ]
 
-        vsr_full_kt = griddata(
-            vsr_points,
-            vsr_values,
+        srh01_full = griddata(
+            srh_points,
+            srh_values,
             (
                 lon,
                 lat
@@ -4169,17 +4247,17 @@ def process_forecast_hour(
             method="linear"
         )
 
-        vsr_missing = np.isnan(
-            vsr_full_kt
+        srh_missing = np.isnan(
+            srh01_full
         )
 
         if np.any(
-            vsr_missing
+            srh_missing
         ):
 
-            vsr_nearest = griddata(
-                vsr_points,
-                vsr_values,
+            srh_nearest = griddata(
+                srh_points,
+                srh_values,
                 (
                     lon,
                     lat
@@ -4187,26 +4265,21 @@ def process_forecast_hour(
                 method="nearest"
             )
 
-            vsr_full_kt = np.where(
-                vsr_missing,
-                vsr_nearest,
-                vsr_full_kt
+            srh01_full = np.where(
+                srh_missing,
+                srh_nearest,
+                srh01_full
             )
 
         # Light smoothing for contour readability only.
-        vsr_full_kt = gaussian_filter(
-            vsr_full_kt,
+        srh01_full = gaussian_filter(
+            srh01_full,
             sigma=0.55
-        )
-
-        vsr_full_kt = np.maximum(
-            vsr_full_kt,
-            0.0
         )
 
     else:
 
-        vsr_full_kt = np.full_like(
+        srh01_full = np.full_like(
             ecape_full,
             np.nan,
             dtype=float
@@ -4281,20 +4354,20 @@ def process_forecast_hour(
 
 
     # ========================================================
-    # 0-1 KM MEAN VSR CONTOURS
+    # 0-1 KM SRH CONTOURS
     # ========================================================
 
     if np.any(
         np.isfinite(
-            vsr_full_kt
+            srh01_full
         )
     ):
 
-        vsr_contours = ax.contour(
+        srh_contours = ax.contour(
             lon,
             lat,
-            vsr_full_kt,
-            levels=VSR_LEVELS_KT,
+            srh01_full,
+            levels=SRH_LEVELS,
             colors="black",
             linewidths=1.4,
             linestyles="dashed",
@@ -4302,9 +4375,9 @@ def process_forecast_hour(
             zorder=21
         )
 
-        vsr_labels = ax.clabel(
-            vsr_contours,
-            levels=VSR_LEVELS_KT,
+        srh_labels = ax.clabel(
+            srh_contours,
+            levels=SRH_LEVELS,
             inline=True,
             inline_spacing=6,
             fmt=lambda value: f"{int(value)}",
@@ -4312,7 +4385,7 @@ def process_forecast_hour(
             colors="black"
         )
 
-        for label in vsr_labels:
+        for label in srh_labels:
 
             label.set_path_effects(
                 [
@@ -4325,7 +4398,7 @@ def process_forecast_hour(
 
 
     # ========================================================
-    # 0-3 KM BULK-SHEAR BARBS
+    # 0-6 KM BULK-SHEAR BARBS
     # ========================================================
 
     ax.barbs(
@@ -4428,7 +4501,7 @@ def process_forecast_hour(
 
     main_title = (
         "HRRR | Surface-Based ECAPE, "
-        "0-1 km VSR + 0-3 km Bulk Shear"
+        "0-1 km SRH + 0-6 km Bulk Shear"
     )
 
     valid_title = (
@@ -4608,8 +4681,8 @@ def process_forecast_hour(
         0.99,
         0.015,
         (
-            "Contours: 0-1 km mean VSR (kt) | "
-            "Barbs: 0-3 km bulk shear vector (kt)"
+            "Contours: 0-1 km SRH (m²/s²) | "
+            "Barbs: 0-6 km bulk shear vector (kt)"
         ),
         transform=ax.transAxes,
         ha="right",
