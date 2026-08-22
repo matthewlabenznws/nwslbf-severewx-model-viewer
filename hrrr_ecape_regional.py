@@ -4344,7 +4344,7 @@ def process_forecast_hour(
     remote_key = (
         f"{R2_PRODUCT_PATH}/"
         f"{cycle_str}/"
-        f"lbf/"
+        f"regional/"
         f"{os.path.basename(map_path)}"
     )
 
