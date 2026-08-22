@@ -1175,32 +1175,11 @@ function productOptionsForModel(
       [
         "gust_dcape",
         "Wind Gust / DCAPE"
-      ]
-
-    ];
-
-  }
-
-
-  if (
-    model === "rrfs"
-  ) {
-
-    return [
-
-      [
-        "refl_uh",
-        "Reflectivity/UH"
       ],
 
       [
-        "hail_swath",
-        "Hail Swath"
-      ],
-
-      [
-        "gust_dcape",
-        "Wind Gust / DCAPE"
+        "ecape",
+        "ECAPE"
       ]
 
     ];
@@ -1362,13 +1341,13 @@ function productIsRegionalOnly(
 ) {
 
   return (
-    (
-      model === "hrrr"
-      ||
-      model === "rrfs"
-    )
+    model === "hrrr"
     &&
-    product === "gust_dcape"
+    (
+      product === "gust_dcape"
+      ||
+      product === "ecape"
+    )
   );
 
 }
@@ -1898,17 +1877,28 @@ function getFileName(
 
 
   if (
-    (
-      model === "hrrr"
-      ||
-      model === "rrfs"
-    )
+    model === "hrrr"
     &&
     product === "gust_dcape"
   ) {
 
     return (
-      `${model}_gust_dcape_`
+      `hrrr_gust_dcape_`
+      +
+      `f${f}.png`
+    );
+
+  }
+
+
+  if (
+    model === "hrrr"
+    &&
+    product === "ecape"
+  ) {
+
+    return (
+      `hrrr_regional_`
       +
       `f${f}.png`
     );
