@@ -1313,13 +1313,21 @@ import xarray as xr
 
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
+import matplotlib.image as mpimg
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+import cartopy.io.shapereader as shpreader
+
+import geopandas as gpd
+
+from shapely.ops import unary_union
+from shapely.prepared import prep
 
 from datetime import datetime, timedelta
 from scipy.interpolate import interp1d, griddata
 from scipy.ndimage import gaussian_filter
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from tqdm.auto import tqdm
 
 from herbie import Herbie
@@ -1331,6 +1339,224 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 
 
 warnings.filterwarnings("ignore")
+
+
+# ============================================================
+# SITE MAP ASSETS
+# ============================================================
+
+ASSET_DIR = os.path.join(
+    os.path.dirname(
+        os.path.abspath(__file__)
+    ),
+    "assets"
+)
+
+COUNTY_SHP = os.path.join(
+    ASSET_DIR,
+    "cb_2018_us_county_500k.shp"
+)
+
+STATE_SHP = os.path.join(
+    ASSET_DIR,
+    "cb_2018_us_state_500k.shp"
+)
+
+LBF_CWA_SHP = os.path.join(
+    ASSET_DIR,
+    "c_18mr25.shp"
+)
+
+LOGO_PATH = os.path.join(
+    ASSET_DIR,
+    "NOAANWSLogos.png"
+)
+
+
+# ============================================================
+# MAP SHAPEFILE HELPERS
+# ============================================================
+
+def add_shapefile_outline(
+    ax,
+    shp_path,
+    extent,
+    edgecolor="black",
+    linewidth=1.0,
+    zorder=10
+):
+
+    if not os.path.exists(
+        shp_path
+    ):
+
+        print(
+            "Missing shapefile:",
+            shp_path
+        )
+
+        return
+
+    gdf = (
+        gpd
+        .read_file(
+            shp_path
+        )
+        .to_crs(
+            epsg=4326
+        )
+    )
+
+    lon_min, lon_max, lat_min, lat_max = extent
+
+    gdf = gdf.cx[
+        lon_min - 1:
+        lon_max + 1,
+
+        lat_min - 1:
+        lat_max + 1
+    ]
+
+    ax.add_geometries(
+        gdf.geometry,
+        crs=ccrs.PlateCarree(),
+        facecolor="none",
+        edgecolor=edgecolor,
+        linewidth=linewidth,
+        zorder=zorder
+    )
+
+
+def get_lbf_cwa_geom(
+    cwa_shp_path
+):
+
+    if not os.path.exists(
+        cwa_shp_path
+    ):
+
+        print(
+            "Missing LBF CWA shapefile:",
+            cwa_shp_path
+        )
+
+        return None
+
+    reader = shpreader.Reader(
+        cwa_shp_path
+    )
+
+    recs = list(
+        reader.records()
+    )
+
+    geoms = [
+
+        r.geometry
+
+        for r in recs
+
+        if (
+            str(
+                r.attributes.get(
+                    "CWA",
+                    ""
+                )
+            )
+            .upper()
+            ==
+            "LBF"
+        )
+
+        or
+
+        (
+            str(
+                r.attributes.get(
+                    "WFO",
+                    ""
+                )
+            )
+            .upper()
+            ==
+            "LBF"
+        )
+
+    ]
+
+    if not geoms:
+
+        geoms = [
+            r.geometry
+            for r in recs
+        ]
+
+    return unary_union(
+        geoms
+    )
+
+
+def add_counties_clipped_to_cwa(
+    ax,
+    counties_shp_path,
+    cwa_geom,
+    linewidth=1.0,
+    edgecolor="black",
+    zorder=14
+):
+
+    if (
+        cwa_geom is None
+        or
+        not os.path.exists(
+            counties_shp_path
+        )
+    ):
+
+        return
+
+    reader = shpreader.Reader(
+        counties_shp_path
+    )
+
+    cwa_prepared = prep(
+        cwa_geom
+    )
+
+    clipped = []
+
+    for record in reader.records():
+
+        geom = record.geometry
+
+        if cwa_prepared.intersects(
+            geom
+        ):
+
+            inter = geom.intersection(
+                cwa_geom
+            )
+
+            if not inter.is_empty:
+
+                clipped.append(
+                    inter
+                )
+
+    ax.add_geometries(
+        clipped,
+        crs=ccrs.PlateCarree(),
+        facecolor="none",
+        edgecolor=edgecolor,
+        linewidth=linewidth,
+        zorder=zorder
+    )
+
+
+LBF_CWA_GEOM = get_lbf_cwa_geom(
+    LBF_CWA_SHP
+)
+
 
 
 # ============================================================
@@ -1513,12 +1739,12 @@ def upload_runs_json(
 # SETTINGS
 # ============================================================
 
-# LBF map extent from your site
-LBF_EXTENT = [
-    -103.8,
-    -97.0,
-    40.0,
-    43.4,
+# Regional map extent
+REGIONAL_EXTENT = [
+    -107.5,
+    -93.0,
+    38.5,
+    44.2,
 ]
 
 # Original Peters / GET_ECAPE vertical settings
@@ -1712,7 +1938,6 @@ ECAPE_NORM = BoundaryNorm(
 )
 
 ECAPE_TICKS = [
-    0,
     500,
     1000,
     1500,
@@ -1723,32 +1948,18 @@ ECAPE_TICKS = [
     4000,
     4500,
     5000,
+    5500,
     6000,
-    7000,
-    8000,
-    9000,
-    10000,
+    8500,
 ]
 
 
 # ============================================================
-# STATIONS
+# CITY LABELS
 # ============================================================
 
-STATIONS = {
-    "Gordon":       (-102.2038, 42.8061),
-    "Oshkosh":      (-102.3465, 41.4047),
-    "Ogallala":     (-101.7205, 41.1275),
-    "Mullen":       (-101.0427, 42.0425),
-    "Valentine":    (-100.5514, 42.8586),
-    "Ainsworth":    (-99.8516, 42.5467),
-    "Burwell":      (-99.1766, 41.7666),
-    "North Platte": (-100.6689, 41.1220),
-    "Broken Bow":   (-99.6385, 41.4365),
-    "Imperial":     (-101.6243, 40.5106),
-    "Curtis":       (-100.5219, 40.6344),
-    "O'Neill":      (-98.6470, 42.4578),
-}
+# City/station labels are intentionally not plotted on this product.
+
 
 
 # ============================================================
@@ -3484,12 +3695,12 @@ def process_forecast_hour(
 
 
     # ============================================================
-    # SUBSET ALL DATA TO LBF DOMAIN BEFORE LOADING ARRAYS
+    # SUBSET ALL DATA TO REGIONAL DOMAIN BEFORE LOADING ARRAYS
     # ============================================================
 
     yslice, xslice = get_xy_slice(
         t2_da,
-        LBF_EXTENT,
+        REGIONAL_EXTENT,
         pad=2
     )
 
@@ -4003,12 +4214,31 @@ def process_forecast_hour(
 
 
     # ============================================================
-    # PLOT LBF MAP
+    # PLOT REGIONAL MAP
+    #
+    # This map framework intentionally matches the other CAMS
+    # products:
+    #   * figsize=(14, 10)
+    #   * regional site extent
+    #   * state/county shapefiles
+    #   * LBF CWA county emphasis + black/white CWA outline
+    #   * NOAA/NWS logo + office label
+    #   * creator credit
+    #   * bottom colorbar via make_axes_locatable
+    #
+    # Meteorological fields remain:
+    #   Fill:     Surface-Based ECAPE
+    #   Contour:  0-1 km mean VSR
+    #   Barbs:    0-3 km bulk shear vector
     # ============================================================
 
     plt.close(
         "all"
     )
+
+    plt.rcParams[
+        "contour.negative_linestyle"
+    ] = "solid"
 
     fig = plt.figure(
         figsize=(
@@ -4018,16 +4248,12 @@ def process_forecast_hour(
     )
 
     ax = plt.axes(
-        projection=(
-            ccrs.PlateCarree()
-        )
+        projection=ccrs.PlateCarree()
     )
 
     ax.set_extent(
-        LBF_EXTENT,
-        crs=(
-            ccrs.PlateCarree()
-        )
+        REGIONAL_EXTENT,
+        crs=ccrs.PlateCarree()
     )
 
     ax.add_feature(
@@ -4037,6 +4263,10 @@ def process_forecast_hour(
     )
 
 
+    # ========================================================
+    # ECAPE FILL
+    # ========================================================
+
     pm = ax.contourf(
         lon,
         lat,
@@ -4044,56 +4274,22 @@ def process_forecast_hour(
         levels=ECAPE_BOUNDS,
         cmap=ECAPE_CMAP,
         norm=ECAPE_NORM,
-        extend="max",
+        extend="neither",
         transform=ccrs.PlateCarree(),
-        zorder=4
+        zorder=5
     )
 
 
-    # States
-    ax.add_feature(
-        cfeature.STATES.with_scale(
-            "50m"
-        ),
-        edgecolor="black",
-        linewidth=1.1,
-        facecolor="none",
-        zorder=10
-    )
+    # ========================================================
+    # 0-1 KM MEAN VSR CONTOURS
+    # ========================================================
 
-
-    # Counties
-    try:
-
-        counties = cfeature.NaturalEarthFeature(
-            category="cultural",
-            name="admin_2_counties",
-            scale="10m",
-            facecolor="none"
-        )
-
-        ax.add_feature(
-            counties,
-            edgecolor="black",
-            linewidth=0.45,
-            zorder=9
-        )
-
-    except Exception:
-
-        pass
-
-
-    # 0-1 km mean storm-relative wind contours.
     if np.any(
         np.isfinite(
             vsr_full_kt
         )
     ):
 
-        # 0-1 km VSR contours.
-        # Use black dashed lines so they do not compete with the
-        # ECAPE fill colors.
         vsr_contours = ax.contour(
             lon,
             lat,
@@ -4103,11 +4299,9 @@ def process_forecast_hour(
             linewidths=1.4,
             linestyles="dashed",
             transform=ccrs.PlateCarree(),
-            zorder=18
+            zorder=21
         )
 
-        # Label contour values directly. Units are explained once
-        # in the lower-right map annotation.
         vsr_labels = ax.clabel(
             vsr_contours,
             levels=VSR_LEVELS_KT,
@@ -4118,98 +4312,123 @@ def process_forecast_hour(
             colors="black"
         )
 
-        # White halo keeps labels readable over every ECAPE shade.
         for label in vsr_labels:
-            label.set_path_effects([
-                pe.withStroke(
-                    linewidth=3.0,
-                    foreground="white"
-                )
-            ])
 
-
-    # 0-3 km bulk-shear vector barbs.
-    ax.barbs(
-        calc_lon[
-            ::BARB_SKIP,
-            ::BARB_SKIP
-        ],
-
-        calc_lat[
-            ::BARB_SKIP,
-            ::BARB_SKIP
-        ],
-
-        shear_u_sample[
-            ::BARB_SKIP,
-            ::BARB_SKIP
-        ]
-        * 1.94384,
-
-        shear_v_sample[
-            ::BARB_SKIP,
-            ::BARB_SKIP
-        ]
-        * 1.94384,
-
-        length=5,
-        linewidth=0.65,
-        color="black",
-
-        transform=(
-            ccrs.PlateCarree()
-        ),
-
-        zorder=20
-    )
-
-
-    # Station labels.
-    for name, (
-        station_lon,
-        station_lat
-    ) in STATIONS.items():
-
-        if (
-            LBF_EXTENT[
-                0
-            ]
-            <= station_lon
-            <= LBF_EXTENT[
-                1
-            ]
-            and
-            LBF_EXTENT[
-                2
-            ]
-            <= station_lat
-            <= LBF_EXTENT[
-                3
-            ]
-        ):
-
-            ax.text(
-                station_lon,
-                station_lat,
-                name,
-                transform=ccrs.PlateCarree(),
-                fontsize=8,
-                ha="center",
-                va="center",
-                color="black",
-                zorder=30,
-                path_effects=[
+            label.set_path_effects(
+                [
                     pe.withStroke(
-                        linewidth=2.5,
+                        linewidth=3.0,
                         foreground="white"
                     )
                 ]
             )
 
 
+    # ========================================================
+    # 0-3 KM BULK-SHEAR BARBS
+    # ========================================================
+
+    ax.barbs(
+        calc_lon[
+            ::BARB_SKIP,
+            ::BARB_SKIP
+        ],
+        calc_lat[
+            ::BARB_SKIP,
+            ::BARB_SKIP
+        ],
+        shear_u_sample[
+            ::BARB_SKIP,
+            ::BARB_SKIP
+        ]
+        *
+        1.94384,
+        shear_v_sample[
+            ::BARB_SKIP,
+            ::BARB_SKIP
+        ]
+        *
+        1.94384,
+        length=5,
+        linewidth=0.7,
+        color="black",
+        transform=ccrs.PlateCarree(),
+        zorder=23
+    )
+
+
+    # ========================================================
+    # STATES / COUNTIES
+    #
+    # Same appearance as the other site products.
+    # ========================================================
+
+    add_shapefile_outline(
+        ax,
+        STATE_SHP,
+        REGIONAL_EXTENT,
+        edgecolor="black",
+        linewidth=1.4,
+        zorder=13
+    )
+
+    add_shapefile_outline(
+        ax,
+        COUNTY_SHP,
+        REGIONAL_EXTENT,
+        edgecolor="lightgray",
+        linewidth=0.35,
+        zorder=12
+    )
+
+
+    # ========================================================
+    # LBF CWA
+    # ========================================================
+
+    if LBF_CWA_GEOM is not None:
+
+        add_counties_clipped_to_cwa(
+            ax,
+            COUNTY_SHP,
+            LBF_CWA_GEOM,
+            linewidth=1.0,
+            edgecolor="black",
+            zorder=13
+        )
+
+        # Black outer border.
+        ax.add_geometries(
+            [
+                LBF_CWA_GEOM
+            ],
+            crs=ccrs.PlateCarree(),
+            facecolor="none",
+            edgecolor="black",
+            linewidth=3.5,
+            zorder=14
+        )
+
+        # White inner border.
+        ax.add_geometries(
+            [
+                LBF_CWA_GEOM
+            ],
+            crs=ccrs.PlateCarree(),
+            facecolor="none",
+            edgecolor="white",
+            linewidth=1.8,
+            zorder=15
+        )
+
+
+    # ========================================================
+    # TITLES
+    # ========================================================
+
     main_title = (
-        "HRRR | Surface-Based ECAPE, 0-1 km VSR "
-        "+ 0-3 km Bulk Shear"
+        "HRRR | Surface-Based ECAPE, "
+        "0-1 km VSR + 0-3 km Bulk Shear"
     )
 
     valid_title = (
@@ -4222,7 +4441,6 @@ def process_forecast_hour(
         f"{init_dt:%a %Y-%m-%d %Hz} HRRR"
     )
 
-
     ax.text(
         0.0,
         1.042,
@@ -4230,7 +4448,7 @@ def process_forecast_hour(
         transform=ax.transAxes,
         ha="left",
         va="bottom",
-        fontsize=14,
+        fontsize=13,
         fontweight="bold"
     )
 
@@ -4257,13 +4475,31 @@ def process_forecast_hour(
     )
 
 
+    # ========================================================
+    # COLORBAR
+    #
+    # Same bottom placement as the other site maps.
+    # Fixed labels and no max-extension arrow.
+    # ========================================================
+
+    divider = make_axes_locatable(
+        ax
+    )
+
+    cax = divider.append_axes(
+        "bottom",
+        size="3%",
+        pad=0.25,
+        axes_class=plt.Axes
+    )
+
     cbar = plt.colorbar(
         pm,
-        ax=ax,
+        cax=cax,
         orientation="horizontal",
-        pad=0.045,
-        fraction=0.04,
-        ticks=ECAPE_TICKS
+        ticks=ECAPE_TICKS,
+        drawedges=True,
+        extend="neither"
     )
 
     cbar.set_label(
@@ -4272,20 +4508,86 @@ def process_forecast_hour(
         weight="bold"
     )
 
+    cbar.ax.xaxis.set_label_position(
+        "top"
+    )
+
     cbar.ax.tick_params(
+        axis="x",
+        which="both",
         labelsize=8,
         length=0
     )
 
 
+    # ========================================================
+    # NOAA / NWS LOGO
+    # ========================================================
+
+    if os.path.exists(
+        LOGO_PATH
+    ):
+
+        logo = mpimg.imread(
+            LOGO_PATH
+        )
+
+        logo_ax = ax.inset_axes(
+            [
+                0.82,
+                0.84,
+                0.165,
+                0.155
+            ],
+            transform=ax.transAxes,
+            zorder=50
+        )
+
+        logo_ax.imshow(
+            logo
+        )
+
+        logo_ax.axis(
+            "off"
+        )
+
+
+    # ========================================================
+    # OFFICE LABEL
+    # ========================================================
+
+    ax.text(
+        0.902,
+        0.835,
+        "NWS North Platte, NE",
+        transform=ax.transAxes,
+        ha="center",
+        va="top",
+        fontsize=10,
+        fontweight="bold",
+        color="black",
+        zorder=51,
+        path_effects=[
+            pe.withStroke(
+                linewidth=2.5,
+                foreground="white"
+            )
+        ]
+    )
+
+
+    # ========================================================
+    # CREATOR CREDIT
+    # ========================================================
+
     ax.text(
         0.01,
         0.015,
-        "Peters ECAPE | Mixing length = 250 m",
+        "Plot created by: Matthew Labenz",
         transform=ax.transAxes,
         ha="left",
         va="bottom",
-        fontsize=8,
+        fontsize=9,
         weight="bold",
         color="black",
         zorder=40,
@@ -4297,10 +4599,18 @@ def process_forecast_hour(
         ]
     )
 
+
+    # ========================================================
+    # PRODUCT DESCRIPTION
+    # ========================================================
+
     ax.text(
         0.99,
         0.015,
-        "Contours: 0-1 km mean VSR (kt) | Barbs: 0-3 km bulk shear vector (kt)",
+        (
+            "Contours: 0-1 km mean VSR (kt) | "
+            "Barbs: 0-3 km bulk shear vector (kt)"
+        ),
         transform=ax.transAxes,
         ha="right",
         va="bottom",
@@ -4315,7 +4625,6 @@ def process_forecast_hour(
             )
         ]
     )
-
 
     map_path = os.path.join(
         OUTDIR,
