@@ -1352,6 +1352,29 @@ ASSET_DIR = os.path.join(
     "assets"
 )
 
+
+# ============================================================
+# EXTRACT LBF CWA SHAPEFILE
+# ============================================================
+
+zip_path = os.path.join(
+    ASSET_DIR,
+    "c_18mr25.zip"
+)
+
+if os.path.exists(
+    zip_path
+):
+
+    with zipfile.ZipFile(
+        zip_path,
+        "r"
+    ) as zip_ref:
+
+        zip_ref.extractall(
+            ASSET_DIR
+        )
+
 COUNTY_SHP = os.path.join(
     ASSET_DIR,
     "cb_2018_us_county_500k.shp"
