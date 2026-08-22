@@ -4342,12 +4342,11 @@ def process_forecast_hour(
     )
 
     remote_key = (
-        f"{R2_PRODUCT_PATH}/"
-        f"{cycle_str}/"
-        f"lbf/"
-        f"{os.path.basename(map_path)}"
-    )
-
+       f"{R2_PRODUCT_PATH}/"
+       f"{cycle_str}/"
+       f"regional/"
+       f"{os.path.basename(map_path)}"
+   )
     upload_to_r2(
         map_path,
         remote_key
