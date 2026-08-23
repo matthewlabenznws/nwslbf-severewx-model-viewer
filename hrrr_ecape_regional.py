@@ -4516,7 +4516,7 @@ def process_forecast_hour(
             inline=True,
             inline_spacing=6,
             fmt=lambda value: f"{int(value)}%",
-            fontsize=6
+            fontsize=7
         )
 
         for label in rh_labels:
@@ -4528,7 +4528,7 @@ def process_forecast_hour(
             label.set_path_effects(
                 [
                     pe.withStroke(
-                        linewidth=1.0,
+                        linewidth=2.0,
                         foreground="white"
                     )
                 ]
