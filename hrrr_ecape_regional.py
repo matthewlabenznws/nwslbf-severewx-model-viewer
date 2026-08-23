@@ -1818,8 +1818,7 @@ ECAPE_SMOOTH_SIGMA = 0.65
 # Barbs are plotted from the sampled ECAPE grid.
 # ------------------------------------------------------------
 
-BARB_SKIP = 3
-
+BARB_SKIP = 28
 # ------------------------------------------------------------
 # MEAN LCL-LFC RELATIVE HUMIDITY CONTOURS
 #
@@ -1829,6 +1828,15 @@ BARB_SKIP = 3
 # ------------------------------------------------------------
 
 LCL_LFC_RH_LEVELS = [40, 50, 60, 70, 80, 90]
+
+RH_COLORS = [
+    "#8c6d31",  # 40%
+    "#a6611a",  # 50%
+    "#dfc27d",  # 60%
+    "#80cdc1",  # 70%
+    "#35978f",  # 80%
+    "#01665e",  # 90%
+]
 
 # ------------------------------------------------------------
 # SITE OUTPUT
@@ -4415,11 +4423,11 @@ def process_forecast_hour(
             lat,
             lcl_lfc_rh_full,
             levels=LCL_LFC_RH_LEVELS,
-            colors="black",
-            linewidths=1.15,
+            colors=RH_COLORS,
+            linewidths=0.9,
             linestyles="dashed",
             transform=ccrs.PlateCarree(),
-            zorder=21
+            zorder=22
         )
 
         rh_labels = ax.clabel(
@@ -4428,16 +4436,19 @@ def process_forecast_hour(
             inline=True,
             inline_spacing=6,
             fmt=lambda value: f"{int(value)}%",
-            fontsize=8,
-            colors="black"
+            fontsize=8
         )
 
         for label in rh_labels:
 
+            label.set_zorder(
+                30
+            )
+
             label.set_path_effects(
                 [
                     pe.withStroke(
-                        linewidth=2.5,
+                        linewidth=3.0,
                         foreground="white"
                     )
                 ]
