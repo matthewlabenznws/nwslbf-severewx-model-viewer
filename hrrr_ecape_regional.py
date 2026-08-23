@@ -4718,13 +4718,21 @@ def process_forecast_hour(
         f"{init_dt:%a %Y-%m-%d %Hz} HRRR"
     )
 
-    # Colored main title: 0-3 km shear is red
+    # ========================================================
+    # COLORED MAIN TITLE
+    #
+    # 0-1 km = blue
+    # 0-3 km = red
+    # 0-6 km Bulk Shear = black
+    # ========================================================
+
     title_y = 1.042
 
+    # First black portion
     title1 = ax.text(
         0.0,
         title_y,
-        "HRRR | Surface-Based ECAPE, LCL-LFC RH, 0-1 km + ",
+        "HRRR | Surface-Based ECAPE, LCL-LFC RH, ",
         transform=ax.transAxes,
         ha="left",
         va="bottom",
@@ -4734,13 +4742,72 @@ def process_forecast_hour(
     )
 
     fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
-    axes_bbox = ax.get_window_extent(renderer=renderer)
-    bbox1 = title1.get_window_extent(renderer=renderer)
-    x2 = (bbox1.x1 - axes_bbox.x0) / axes_bbox.width
 
+    renderer = fig.canvas.get_renderer()
+    axes_bbox = ax.get_window_extent(
+        renderer=renderer
+    )
+
+    bbox1 = title1.get_window_extent(
+        renderer=renderer
+    )
+
+    x2 = (
+        bbox1.x1
+        - axes_bbox.x0
+    ) / axes_bbox.width
+
+    # Blue 0-1 km portion
     title2 = ax.text(
         x2,
+        title_y,
+        "0-1 km",
+        transform=ax.transAxes,
+        ha="left",
+        va="bottom",
+        fontsize=13,
+        fontweight="bold",
+        color="blue"
+    )
+
+    fig.canvas.draw()
+
+    bbox2 = title2.get_window_extent(
+        renderer=renderer
+    )
+
+    x3 = (
+        bbox2.x1
+        - axes_bbox.x0
+    ) / axes_bbox.width
+
+    # Black separator
+    title3 = ax.text(
+        x3,
+        title_y,
+        " + ",
+        transform=ax.transAxes,
+        ha="left",
+        va="bottom",
+        fontsize=13,
+        fontweight="bold",
+        color="black"
+    )
+
+    fig.canvas.draw()
+
+    bbox3 = title3.get_window_extent(
+        renderer=renderer
+    )
+
+    x4 = (
+        bbox3.x1
+        - axes_bbox.x0
+    ) / axes_bbox.width
+
+    # Red 0-3 km portion
+    title4 = ax.text(
+        x4,
         title_y,
         "0-3 km",
         transform=ax.transAxes,
@@ -4752,11 +4819,19 @@ def process_forecast_hour(
     )
 
     fig.canvas.draw()
-    bbox2 = title2.get_window_extent(renderer=renderer)
-    x3 = (bbox2.x1 - axes_bbox.x0) / axes_bbox.width
 
+    bbox4 = title4.get_window_extent(
+        renderer=renderer
+    )
+
+    x5 = (
+        bbox4.x1
+        - axes_bbox.x0
+    ) / axes_bbox.width
+
+    # Final black portion
     ax.text(
-        x3,
+        x5,
         title_y,
         " + 0-6 km Bulk Shear",
         transform=ax.transAxes,
