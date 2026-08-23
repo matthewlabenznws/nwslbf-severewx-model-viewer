@@ -1248,7 +1248,9 @@ def compute_CAPES_DRAG(T0,p0,q0,start_loc,fracent,prate,z0,T1,T2,Radius,V_SR):
 # 1) Regional-domain map:
 #       Surface-Based ECAPE fill
 #       0-1 km mean storm-relative wind contours
-#       0-3 km bulk-shear vector barbs
+#       0-1 km bulk-shear vector barbs (blue)
+#       0-3 km bulk-shear vector barbs (red)
+#       0-6 km bulk-shear vector barbs (black)
 #
 # 2) Latest-HRRR sounding:
 #       Temperature / dewpoint
@@ -3352,6 +3354,52 @@ def calculate_original_ecape(
         )
 
         # --------------------------------------------------------
+        # 0-1 KM BULK SHEAR VECTOR
+        # --------------------------------------------------------
+
+        if (
+            np.nanmax(
+                z0
+            )
+            >=
+            1000.0
+        ):
+
+            u1 = np.interp(
+                1000.0,
+                z0,
+                u0
+            )
+
+            v1 = np.interp(
+                1000.0,
+                z0,
+                v0
+            )
+
+            shear01_u = (
+                u1
+                -
+                u0[
+                    0
+                ]
+            )
+
+            shear01_v = (
+                v1
+                -
+                v0[
+                    0
+                ]
+            )
+
+        else:
+
+            shear01_u = np.nan
+            shear01_v = np.nan
+
+
+        # --------------------------------------------------------
         # 0-3 KM BULK SHEAR VECTOR
         # --------------------------------------------------------
 
@@ -3459,6 +3507,8 @@ def calculate_original_ecape(
                 "Radius": Radius,
                 "LCL": LCL,
                 "lcl_lfc_rh": lcl_lfc_rh,
+                "shear01_u": shear01_u,
+                "shear01_v": shear01_v,
                 "shear03_u": shear03_u,
                 "shear03_v": shear03_v,
                 "shear06_u": shear06_u,
@@ -4007,6 +4057,18 @@ def process_forecast_hour(
         dtype=float
     )
 
+    shear01_u_sample = np.full(
+        calc_lat.shape,
+        np.nan,
+        dtype=float
+    )
+
+    shear01_v_sample = np.full(
+        calc_lat.shape,
+        np.nan,
+        dtype=float
+    )
+
     shear03_u_sample = np.full(
         calc_lat.shape,
         np.nan,
@@ -4112,6 +4174,24 @@ def process_forecast_hour(
                     ] = (
                         details[
                             "lcl_lfc_rh"
+                        ]
+                    )
+
+                    shear01_u_sample[
+                        jj,
+                        ii
+                    ] = (
+                        details[
+                            "shear01_u"
+                        ]
+                    )
+
+                    shear01_v_sample[
+                        jj,
+                        ii
+                    ] = (
+                        details[
+                            "shear01_v"
                         ]
                     )
 
@@ -4525,6 +4605,40 @@ def process_forecast_hour(
 
 
     # ========================================================
+    # 0-1 KM BULK-SHEAR BARBS -- BLUE
+    #
+    # ========================================================
+
+    ax.barbs(
+        calc_lon[
+            ::BARB_SKIP,
+            ::BARB_SKIP
+        ],
+        calc_lat[
+            ::BARB_SKIP,
+            ::BARB_SKIP
+        ],
+        shear01_u_sample[
+            ::BARB_SKIP,
+            ::BARB_SKIP
+        ]
+        *
+        1.94384,
+        shear01_v_sample[
+            ::BARB_SKIP,
+            ::BARB_SKIP
+        ]
+        *
+        1.94384,
+        length=4.0,
+        linewidth=0.70,
+        color="blue",
+        transform=ccrs.PlateCarree(),
+        zorder=25
+    )
+
+
+    # ========================================================
     # STATES / COUNTIES
     #
     # Same appearance as the other site products.
@@ -4610,7 +4724,7 @@ def process_forecast_hour(
     title1 = ax.text(
         0.0,
         title_y,
-        "HRRR | Surface-Based ECAPE, LCL-LFC RH, ",
+        "HRRR | Surface-Based ECAPE, LCL-LFC RH, 0-1 km + ",
         transform=ax.transAxes,
         ha="left",
         va="bottom",
