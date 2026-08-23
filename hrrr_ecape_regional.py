@@ -4528,7 +4528,7 @@ def process_forecast_hour(
             label.set_path_effects(
                 [
                     pe.withStroke(
-                        linewidth=2.0,
+                        linewidth=1.0,
                         foreground="white"
                     )
                 ]
