@@ -1818,7 +1818,7 @@ ECAPE_SMOOTH_SIGMA = 0.65
 # Barbs are plotted from the sampled ECAPE grid.
 # ------------------------------------------------------------
 
-BARB_SKIP = 10
+BARB_SKIP = 8
 # ------------------------------------------------------------
 # MEAN LCL-LFC RELATIVE HUMIDITY CONTOURS
 #
