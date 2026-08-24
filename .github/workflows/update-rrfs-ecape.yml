@@ -1,0 +1,105 @@
+name: Update RRFS ECAPE
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-rrfs-ecape:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ======================================================
+      # CHECK OUT REPOSITORY
+      # ======================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ======================================================
+      # SET UP PYTHON
+      # ======================================================
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+
+      # ======================================================
+      # INSTALL SYSTEM DEPENDENCIES
+      # ======================================================
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libeccodes0 \
+            libeccodes-dev \
+            eccodes
+
+
+      # ======================================================
+      # INSTALL PYTHON PACKAGES
+      # ======================================================
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+
+          pip install \
+            numpy \
+            scipy \
+            pandas \
+            xarray \
+            cfgrib \
+            eccodes \
+            metpy \
+            matplotlib \
+            cartopy \
+            shapely \
+            pyshp \
+            requests \
+            tqdm \
+            boto3
+
+
+      # ======================================================
+      # RUN RRFS ECAPE SCRIPT
+      # ======================================================
+
+      - name: Generate RRFS ECAPE graphics
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          python rrfs_ecape.py
+
+
+      # ======================================================
+      # SHOW GENERATED FILES
+      # ======================================================
+
+      - name: Show generated files
+        if: always()
+        run: |
+          echo "Generated RRFS ECAPE files:"
+          find . -type f | grep -E "rrfs.*ecape|ecape.*rrfs" || true
+
+
+      # ======================================================
+      # CLEAN UP
+      # ======================================================
+
+      - name: Clean temporary GRIB files
+        if: always()
+        run: |
+          rm -rf rrfs_ecape_subsets
+          rm -f *.grib2
+          rm -f *.idx
