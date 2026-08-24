@@ -1206,6 +1206,11 @@ function productOptionsForModel(
       [
         "gust_dcape",
         "Wind Gust / DCAPE"
+      ],
+
+      [
+        "ecape",
+        "ECAPE"
       ]
 
     ];
@@ -1378,7 +1383,11 @@ function productIsRegionalOnly(
     )
     ||
     (
-      model === "hrrr"
+      (
+        model === "hrrr"
+        ||
+        model === "rrfs"
+      )
       &&
       product === "ecape"
     )
@@ -1930,13 +1939,17 @@ function getFileName(
 
 
   if (
-    model === "hrrr"
+    (
+      model === "hrrr"
+      ||
+      model === "rrfs"
+    )
     &&
     product === "ecape"
   ) {
 
     return (
-      `hrrr_regional_`
+      `${model}_regional_`
       +
       `f${f}.png`
     );
