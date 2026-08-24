@@ -4529,7 +4529,7 @@ def process_forecast_hour(
                 [
                     pe.withStroke(
                         linewidth=1.0,
-                        foreground="white"
+                        foreground="black"
                     )
                 ]
             )
