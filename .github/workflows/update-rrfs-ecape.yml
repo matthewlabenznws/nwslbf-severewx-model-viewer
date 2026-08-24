@@ -37,14 +37,14 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
+
           sudo apt-get install -y \
             libeccodes0 \
-            libeccodes-dev \
-            eccodes
+            libeccodes-dev
 
 
       # ======================================================
-      # INSTALL PYTHON PACKAGES
+      # INSTALL PYTHON DEPENDENCIES
       # ======================================================
 
       - name: Install Python dependencies
@@ -69,6 +69,18 @@ jobs:
 
 
       # ======================================================
+      # SHOW PYTHON / ECCODES INFORMATION
+      # ======================================================
+
+      - name: Check Python and ecCodes
+        run: |
+          python --version
+
+          python -c "import eccodes; print('eccodes Python package loaded successfully')"
+          python -c "import cfgrib; print('cfgrib loaded successfully')"
+
+
+      # ======================================================
       # RUN RRFS ECAPE SCRIPT
       # ======================================================
 
@@ -86,20 +98,66 @@ jobs:
       # SHOW GENERATED FILES
       # ======================================================
 
-      - name: Show generated files
+      - name: Show generated RRFS ECAPE files
         if: always()
         run: |
-          echo "Generated RRFS ECAPE files:"
-          find . -type f | grep -E "rrfs.*ecape|ecape.*rrfs" || true
+          echo "========================================"
+          echo "RRFS ECAPE generated files"
+          echo "========================================"
+
+          find site/runs/cams/rrfs/ecape \
+            -type f \
+            2>/dev/null \
+            | sort \
+            || true
 
 
       # ======================================================
-      # CLEAN UP
+      # SHOW TEMPORARY RRFS FILES IF RUN FAILS
       # ======================================================
 
-      - name: Clean temporary GRIB files
+      - name: Show temporary RRFS files
+        if: failure()
+        run: |
+          echo "========================================"
+          echo "Temporary RRFS files"
+          echo "========================================"
+
+          find rrfs_ecape_subsets \
+            -type f \
+            2>/dev/null \
+            | sort \
+            || true
+
+
+      # ======================================================
+      # CLEAN UP TEMPORARY GRIB FILES
+      # ======================================================
+
+      - name: Clean temporary RRFS files
         if: always()
         run: |
           rm -rf rrfs_ecape_subsets
-          rm -f *.grib2
-          rm -f *.idx
+
+          find . \
+            -type f \
+            \( \
+              -name "*.grib2" \
+              -o \
+              -name "*.grib2.*" \
+              -o \
+              -name "*.idx" \
+            \) \
+            -delete \
+            2>/dev/null \
+            || true
+
+
+      # ======================================================
+      # COMPLETE
+      # ======================================================
+
+      - name: RRFS ECAPE workflow complete
+        if: success()
+        run: |
+          echo "RRFS ECAPE workflow completed successfully."
