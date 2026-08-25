@@ -85,15 +85,51 @@ jobs:
 
 
       # ======================================================
+      # CHECK R2 ENVIRONMENT VARIABLES
+      # ======================================================
+
+      - name: Check R2 configuration
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_ENDPOINT_URL: ${{ secrets.AWS_ENDPOINT_URL }}
+          AWS_BUCKET: ${{ secrets.AWS_BUCKET }}
+        run: |
+          echo "Checking required R2 environment variables..."
+
+          test -n "$AWS_ACCESS_KEY_ID" || {
+            echo "ERROR: AWS_ACCESS_KEY_ID is not set"
+            exit 1
+          }
+
+          test -n "$AWS_SECRET_ACCESS_KEY" || {
+            echo "ERROR: AWS_SECRET_ACCESS_KEY is not set"
+            exit 1
+          }
+
+          test -n "$AWS_ENDPOINT_URL" || {
+            echo "ERROR: AWS_ENDPOINT_URL is not set"
+            exit 1
+          }
+
+          test -n "$AWS_BUCKET" || {
+            echo "ERROR: AWS_BUCKET is not set"
+            exit 1
+          }
+
+          echo "R2 environment variables are configured."
+
+
+      # ======================================================
       # RUN RRFS ECAPE SCRIPT
       # ======================================================
 
       - name: Generate RRFS ECAPE graphics
         env:
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_ENDPOINT_URL: ${{ secrets.AWS_ENDPOINT_URL }}
+          AWS_BUCKET: ${{ secrets.AWS_BUCKET }}
         run: |
           python rrfs_ecape.py
 
