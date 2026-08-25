@@ -61,6 +61,7 @@ jobs:
             metpy \
             matplotlib \
             cartopy \
+            geopandas \
             shapely \
             pyshp \
             requests \
@@ -69,15 +70,18 @@ jobs:
 
 
       # ======================================================
-      # SHOW PYTHON / ECCODES INFORMATION
+      # CHECK PYTHON / IMPORTANT PACKAGES
       # ======================================================
 
-      - name: Check Python and ecCodes
+      - name: Check Python packages
         run: |
           python --version
 
-          python -c "import eccodes; print('eccodes Python package loaded successfully')"
+          python -c "import eccodes; print('eccodes loaded successfully')"
           python -c "import cfgrib; print('cfgrib loaded successfully')"
+          python -c "import geopandas; print('geopandas loaded successfully')"
+          python -c "import cartopy; print('cartopy loaded successfully')"
+          python -c "import metpy; print('MetPy loaded successfully')"
 
 
       # ======================================================
@@ -102,7 +106,7 @@ jobs:
         if: always()
         run: |
           echo "========================================"
-          echo "RRFS ECAPE generated files"
+          echo "RRFS ECAPE GENERATED FILES"
           echo "========================================"
 
           find site/runs/cams/rrfs/ecape \
@@ -113,14 +117,14 @@ jobs:
 
 
       # ======================================================
-      # SHOW TEMPORARY RRFS FILES IF RUN FAILS
+      # SHOW TEMPORARY FILES IF SCRIPT FAILS
       # ======================================================
 
       - name: Show temporary RRFS files
         if: failure()
         run: |
           echo "========================================"
-          echo "Temporary RRFS files"
+          echo "TEMPORARY RRFS FILES"
           echo "========================================"
 
           find rrfs_ecape_subsets \
