@@ -1630,7 +1630,7 @@ def upload_runs_json(
         obj = s3.get_object(
             Bucket=BUCKET,
             Key=(
-                f"runs/cams/hrrr/ecape/"
+                f"{R2_PRODUCT_PATH}/"
                 f"runs.json"
             )
         )
@@ -1751,8 +1751,8 @@ def upload_runs_json(
     upload_to_r2(
         local_runs,
         (
-            f"runs/cams/hrrr/ecape/"
-            f"runs.json"
+            f"{R2_PRODUCT_PATH}/"
+                f"runs.json"
         ),
         content_type="application/json"
     )
