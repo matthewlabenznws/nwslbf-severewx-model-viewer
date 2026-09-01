@@ -5383,13 +5383,13 @@ def process_forecast_hour(
             zorder=22
         )
 
-        rh_labels = ax.clabel(
+         rh_labels = ax.clabel(
             rh_contours,
             levels=LCL_LFC_RH_LEVELS,
             inline=True,
             inline_spacing=6,
             fmt=lambda value: f"{int(value)}%",
-            fontsize=8
+            fontsize=7
         )
 
         for label in rh_labels:
@@ -5401,8 +5401,8 @@ def process_forecast_hour(
             label.set_path_effects(
                 [
                     pe.withStroke(
-                        linewidth=3.0,
-                        foreground="white"
+                        linewidth=1.0,
+                        foreground="black"
                     )
                 ]
             )
