@@ -5383,7 +5383,7 @@ def process_forecast_hour(
             zorder=22
         )
 
-         rh_labels = ax.clabel(
+        rh_labels = ax.clabel(
             rh_contours,
             levels=LCL_LFC_RH_LEVELS,
             inline=True,
