@@ -6,12 +6,9 @@ on:
 permissions:
   contents: read
 
-# Prevent multiple RRFS-MPAS publishers from running at the same time.
-# This is important because cron-job.org will trigger the workflow
-# every 15 minutes, while a large 00Z/12Z update may take longer.
-#
-# Do NOT cancel a run already in progress. A later trigger will wait
-# rather than interrupting an active FTP download / R2 upload.
+# Prevent two RRFS-MPAS jobs from running at the same time.
+# This will be especially important once cron-job.org triggers
+# the workflow every 15 minutes.
 concurrency:
   group: rrfs-mpas-refl-uh
   cancel-in-progress: false
@@ -20,20 +17,23 @@ jobs:
   run-rrfs-mpas-r2:
     runs-on: ubuntu-latest
 
-    # Gives a larger incremental update plenty of time to finish.
+    # Allows plenty of time for slower 00Z/12Z runs or an
+    # initial run that has several forecast hours to process.
     timeout-minutes: 180
 
     steps:
-      # ----------------------------------------------------------
-      # CHECKOUT REPOSITORY
-      # ----------------------------------------------------------
+
+      # ---------------------------------------------------------
+      # CHECKOUT
+      # ---------------------------------------------------------
 
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ----------------------------------------------------------
-      # PYTHON 3.11
-      # ----------------------------------------------------------
+
+      # ---------------------------------------------------------
+      # PYTHON
+      # ---------------------------------------------------------
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -41,23 +41,20 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      # ----------------------------------------------------------
-      # INSTALL EXISTING PROJECT REQUIREMENTS
-      #
-      # Make sure "eccodes" is included in requirements.txt.
-      # ----------------------------------------------------------
+
+      # ---------------------------------------------------------
+      # DEPENDENCIES
+      # ---------------------------------------------------------
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ----------------------------------------------------------
+
+      # ---------------------------------------------------------
       # VERIFY ECCODES
-      #
-      # RRFS-MPAS uses the Python ecCodes interface directly
-      # instead of Herbie for reading the GSL GRIB2 files.
-      # ----------------------------------------------------------
+      # ---------------------------------------------------------
 
       - name: Verify ecCodes
         run: |
@@ -68,12 +65,13 @@ jobs:
           print("RRFS-MPAS GRIB2 environment is ready.")
           PY
 
-      # ----------------------------------------------------------
+
+      # ---------------------------------------------------------
       # VERIFY MAP ASSETS
       #
-      # These are the same repository assets used by the HRRR
-      # plotting code.
-      # ----------------------------------------------------------
+      # c_18mr25.zip is checked here instead of c_18mr25.shp.
+      # rrfs_mpas_refl_uh.py extracts the ZIP after it starts.
+      # ---------------------------------------------------------
 
       - name: Verify map assets
         shell: bash
@@ -83,7 +81,7 @@ jobs:
           required_files=(
             "assets/cb_2018_us_county_500k.shp"
             "assets/cb_2018_us_state_500k.shp"
-            "assets/c_18mr25.shp"
+            "assets/c_18mr25.zip"
             "assets/NOAANWSLogos.png"
           )
 
@@ -98,25 +96,22 @@ jobs:
 
           echo "All required map assets are available."
 
-      # ----------------------------------------------------------
+
+      # ---------------------------------------------------------
       # RUN RRFS-MPAS
       #
-      # GSL_FTP_EMAIL is stored as a GitHub repository secret.
+      # The Python script:
+      #   * scans the GSL FTP
+      #   * finds 00/03/06/09/12/15/18/21Z runs
+      #   * downloads only needed forecast hours
+      #   * processes each GRIB once
+      #   * creates all required domains
+      #   * uploads PNGs to R2
+      #   * updates runs.json incrementally
       #
-      # The Python script will:
-      #
-      # 00Z -> F000-F048
-      # 03Z -> F000-F012
-      # 06Z -> F000-F012
-      # 09Z -> F000-F012
-      # 12Z -> F000-F048
-      # 15Z -> F000-F012
-      # 18Z -> F000-F012
-      # 21Z -> F000-F012
-      #
-      # It checks R2 first and only downloads/processes forecast
-      # hours that are not already complete.
-      # ----------------------------------------------------------
+      # 00Z / 12Z -> through F048
+      # Other 3-hour cycles -> through F012
+      # ---------------------------------------------------------
 
       - name: Run RRFS-MPAS R2
         env:
@@ -133,13 +128,12 @@ jobs:
         run: |
           python -u rrfs_mpas_refl_uh.py
 
-      # ----------------------------------------------------------
+
+      # ---------------------------------------------------------
       # CLEANUP
       #
-      # The Python script already removes each ~150 MB GRIB2
-      # after processing. This is an additional safety cleanup
-      # and runs even if the Python script fails.
-      # ----------------------------------------------------------
+      # Runs even if the Python script fails.
+      # ---------------------------------------------------------
 
       - name: Cleanup temporary files
         if: always()
