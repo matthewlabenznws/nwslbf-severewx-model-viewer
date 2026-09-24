@@ -356,6 +356,10 @@
 
   <span>/</span>
 
+  <a href="cams.html?model=rrfs_mpas">RRFS-MPAS</a>
+
+  <span>/</span>
+
   <a href="cams.html?model=refs&member=m01">REFS MEM01-05</a>
 
 </div>
@@ -397,6 +401,10 @@
 
     <option value="rrfs">
       RRFS
+    </option>
+
+    <option value="rrfs_mpas">
+      RRFS-MPAS
     </option>
 
     <option value="refs">
@@ -454,6 +462,10 @@
 
         <option value="rrfs">
           RRFS
+        </option>
+
+        <option value="rrfs_mpas">
+          RRFS-MPAS
         </option>
 
         <option value="refs">
@@ -1130,15 +1142,29 @@ function modelLabel(
   member
 ) {
 
-  return (
+  if (
     model === "refs"
-    ?
-    "REFS "
-    +
-    member.toUpperCase()
-    :
-    model.toUpperCase()
-  );
+  ) {
+
+    return (
+      "REFS "
+      +
+      member.toUpperCase()
+    );
+
+  }
+
+
+  if (
+    model === "rrfs_mpas"
+  ) {
+
+    return "RRFS-MPAS";
+
+  }
+
+
+  return model.toUpperCase();
 
 }
 
@@ -1211,6 +1237,22 @@ function productOptionsForModel(
       [
         "ecape",
         "ECAPE"
+      ]
+
+    ];
+
+  }
+
+
+  if (
+    model === "rrfs_mpas"
+  ) {
+
+    return [
+
+      [
+        "refl_uh",
+        "Reflectivity/UH"
       ]
 
     ];
@@ -2359,6 +2401,27 @@ function fallbackMaxFhr(
 
 
   if (
+    model === "rrfs_mpas"
+  ) {
+
+    return (
+      [
+        0,
+        12
+      ]
+      .includes(
+        hour
+      )
+      ?
+      48
+      :
+      12
+    );
+
+  }
+
+
+  if (
     model === "refs"
   ) {
 
@@ -3024,6 +3087,23 @@ async function changeView() {
     viewSelect.value;
 
 
+  if (
+    selectedView === "compare_products"
+    &&
+    productOptionsForModel(
+      selectedModel
+    ).length < 2
+  ) {
+
+    selectedView =
+      "single";
+
+    viewSelect.value =
+      selectedView;
+
+  }
+
+
   selectedRun =
     "";
 
@@ -3111,6 +3191,23 @@ async function changeModel() {
 
   selectedModel =
     modelSelect.value;
+
+
+  if (
+    selectedView === "compare_products"
+    &&
+    productOptionsForModel(
+      selectedModel
+    ).length < 2
+  ) {
+
+    selectedView =
+      "single";
+
+    viewSelect.value =
+      selectedView;
+
+  }
 
 
   if (
